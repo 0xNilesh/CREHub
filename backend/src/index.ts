@@ -14,6 +14,7 @@
  *   3. Start Express server
  */
 import express, { type Request, type Response } from 'express'
+import cors from 'cors'
 import { z } from 'zod'
 import { RegistryReader } from './registry'
 import { SearchIndex } from './search'
@@ -27,6 +28,7 @@ import type { Hex } from 'viem'
 
 export const createApp = (cache: WorkflowCache) => {
 	const app = express()
+	app.use(cors())
 	app.use(express.json())
 
 	// ── Health ─────────────────────────────────────────────────────────────────

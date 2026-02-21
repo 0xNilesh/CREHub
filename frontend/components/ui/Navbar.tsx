@@ -6,8 +6,9 @@ import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { useState, useEffect } from 'react'
 
 const NAV_LINKS = [
-  { href: '/browse', label: 'Browse' },
-  { href: '/list',   label: 'List Workflow' },
+  { href: '/browse',          label: 'Browse' },
+  { href: '/list',            label: 'List Workflow' },
+  { href: '/crehub/openclaw', label: 'Agent Skills' },
 ]
 
 // ── Logo mark: abstract interconnected nodes (no brand copying) ───────────────
