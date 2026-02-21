@@ -1,0 +1,36 @@
+{
+  "workflowId": "replace-with-your-cre-workflow-id",
+  "creatorAddress": "0xYOUR_EVM_ADDRESS",
+  "pricePerInvocation": "10000",
+  "description": "One-line description of what this workflow does (≤ 160 chars)",
+  "detailedDescription": "Detailed markdown description of what this workflow does, what APIs it calls, and what the outputs mean.",
+  "inputs": [
+    {
+      "name": "walletAddress",
+      "type": "address",
+      "description": "EVM wallet address to check the health factor for",
+      "required": true
+    },
+    {
+      "name": "protocol",
+      "type": "string",
+      "description": "'aave' or 'compound' — which lending protocol to query",
+      "required": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "healthFactor",
+      "type": "number",
+      "description": "Ratio of collateral to debt. ≥ 1.0 means the position is solvent.",
+      "required": true
+    },
+    {
+      "name": "riskLevel",
+      "type": "string",
+      "description": "'safe' (≥1.5) | 'warning' (1.1–1.5) | 'danger' (<1.1)",
+      "required": true
+    }
+  ],
+  "category": "defi"
+}

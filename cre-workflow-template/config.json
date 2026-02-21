@@ -1,0 +1,5 @@
+{
+  "gatewayPublicKey": "REPLACE_WITH_CREHUB_GATEWAY_EVM_ADDRESS",
+  "workflowId": "replace-with-your-cre-workflow-id",
+  "apiUrl": "https://api.example.com"
+}

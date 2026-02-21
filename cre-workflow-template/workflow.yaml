@@ -1,0 +1,31 @@
+# ==========================================================================
+# CRE WORKFLOW SETTINGS FILE
+# ==========================================================================
+# Each top-level key is a target passed to --target in cre CLI commands.
+# local-simulation   → used with: cre workflow simulate --target local-simulation
+# staging-settings   → used with: cre workflow simulate --target staging-settings
+# production-settings → used with: cre workflow deploy  --target production-settings
+
+# --------------------------------------------------------------------------
+local-simulation:
+  user-workflow:
+    workflow-name: "crehub-workflow-local"
+  workflow-artifacts:
+    workflow-path: "./src/index.ts"
+    config-path: "./config.json"
+
+# --------------------------------------------------------------------------
+staging-settings:
+  user-workflow:
+    workflow-name: "crehub-workflow-staging"
+  workflow-artifacts:
+    workflow-path: "./src/index.ts"
+    config-path: "./config.json"
+
+# --------------------------------------------------------------------------
+production-settings:
+  user-workflow:
+    workflow-name: "crehub-workflow-production"
+  workflow-artifacts:
+    workflow-path: "./src/index.ts"
+    config-path: "./config.json"
