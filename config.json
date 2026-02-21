@@ -1,0 +1,14 @@
+{
+  "contracts": {
+    "SettlementVault": "0x67De4a45a6a98Ba0d15c1eC76485A42250cD7050",
+    "WorkflowRegistry": "0x9f0CA7BbD448Ba69e73D862CFD6448ac75a5521C",
+    "USDC_ADDRESS": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+    "TREASURY_WALLET": "0x1EF7F4c06cB7630FdcB5DD324f22C0A8Ec85F93F",
+    "GATEWAY_ADDRESS": "0xFBDf4Dc13ed423C1E534Da0b2ed229B6a376a31f"
+  },
+  "urls": {
+    "gatewayDeployedUrl": "",
+    "frontendDeployedUrl": "",
+    "backendDeployedUrl": ""
+  }
+}
