@@ -1,0 +1,18 @@
+{
+  "name": "crehub-root",
+  "type": "module",
+  "private": true,
+  "workspaces": [
+    "cre-sdk-typescript/packages/*",
+    "cre-workflow-template"
+  ],
+  "scripts": {
+    "build:sdk": "cd cre-sdk-typescript/packages/cre-sdk && bun run build",
+    "test:workflow": "cd cre-workflow-template && bun test",
+    "test:gateway": "cd gateway && bun test",
+    "test": "bun run test:workflow && bun run test:gateway"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.8"
+  }
+}
