@@ -148,7 +148,7 @@ export const createApp = (cache: WorkflowCache) => {
 if (process.env.NODE_ENV !== 'test') {
 	const registryAddress = process.env.WORKFLOW_REGISTRY_ADDRESS
 	const refreshMs = Number(process.env.REFRESH_INTERVAL_MS ?? 60_000)
-	const port = Number(process.env.PORT ?? 3000)
+	const port = Number(process.env.PORT ?? 4000)
 
 	const reader = new RegistryReader(registryAddress)
 	const index = new SearchIndex()
