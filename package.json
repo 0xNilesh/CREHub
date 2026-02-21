@@ -3,8 +3,7 @@
   "type": "module",
   "private": true,
   "workspaces": [
-    "cre-sdk-typescript/packages/*",
-    "cre-workflow-template"
+    "gateway"
   ],
   "scripts": {
     "build:sdk": "cd cre-sdk-typescript/packages/cre-sdk && bun run build",

@@ -141,10 +141,7 @@ describe('holdAndExecute', () => {
 			},
 		}
 
-		// Mock runSimulate to return success
-		const simulateModule = await import('../src/simulate')
-		const origRunSimulate = simulateModule.runSimulate
-		;(simulateModule as any).runSimulate = async () => ({
+		const mockSimulate = async () => ({
 			success: true,
 			output: { healthFactor: 2.4, riskLevel: 'safe' },
 			logs: [],
@@ -158,6 +155,7 @@ describe('holdAndExecute', () => {
 			amount: PRICE,
 			input: { walletAddress: AGENT_WALLET },
 			settlement: mockSettlement,
+			simulate: mockSimulate,
 		})
 
 		expect(calls).toContain('createEscrow')
@@ -166,8 +164,6 @@ describe('holdAndExecute', () => {
 		expect(result.success).toBe(true)
 		expect(result.output).toEqual({ healthFactor: 2.4, riskLevel: 'safe' })
 		expect(result.settlementTx).toBe('0xsuccessTx')
-
-		;(simulateModule as any).runSimulate = origRunSimulate
 	})
 
 	test('on simulate failure: calls createEscrow then settleFailure', async () => {
@@ -189,9 +185,7 @@ describe('holdAndExecute', () => {
 			},
 		}
 
-		const simulateModule = await import('../src/simulate')
-		const origRunSimulate = simulateModule.runSimulate
-		;(simulateModule as any).runSimulate = async () => ({
+		const mockSimulate = async () => ({
 			success: false,
 			output: null,
 			error: 'handler threw an exception',
@@ -206,6 +200,7 @@ describe('holdAndExecute', () => {
 			amount: PRICE,
 			input: {},
 			settlement: mockSettlement,
+			simulate: mockSimulate,
 		})
 
 		expect(calls).toContain('createEscrow')
@@ -214,7 +209,5 @@ describe('holdAndExecute', () => {
 		expect(result.success).toBe(false)
 		expect(result.error).toBe('handler threw an exception')
 		expect(result.settlementTx).toBe('0xfailureTx')
-
-		;(simulateModule as any).runSimulate = origRunSimulate
 	})
 })

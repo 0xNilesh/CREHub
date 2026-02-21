@@ -150,9 +150,18 @@ export const holdAndExecute = async (params: {
 	amount: bigint
 	input: unknown
 	settlement: SettlementClient
+	simulate?: typeof runSimulate
 }): Promise<ExecutionResult> => {
-	const { workflowId, workflowDir, agentAddress, creatorAddress, amount, input, settlement } =
-		params
+	const {
+		workflowId,
+		workflowDir,
+		agentAddress,
+		creatorAddress,
+		amount,
+		input,
+		settlement,
+		simulate = runSimulate,
+	} = params
 
 	const inputsJson = JSON.stringify(input)
 
@@ -168,7 +177,7 @@ export const holdAndExecute = async (params: {
 	// 2. Run `cre workflow simulate`
 	let simulateResult: SimulateResult
 	try {
-		simulateResult = await runSimulate(workflowDir, input)
+		simulateResult = await simulate(workflowDir, input)
 	} catch (err) {
 		const errorMessage = err instanceof Error ? err.message : 'Simulation process error'
 		const tx = await settlement.settleFailure({ executionId, errorMessage })

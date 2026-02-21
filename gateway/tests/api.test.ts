@@ -5,6 +5,7 @@
  * Payment verification and simulate are mocked.
  */
 import { describe, expect, test, beforeAll } from 'bun:test'
+import http from 'node:http'
 import { createApp, registerWorkflow } from '../src/index'
 import type { WorkflowMetadata } from '../src/types'
 
@@ -15,15 +16,17 @@ const fetchApp = async (
 	path: string,
 	opts: RequestInit = {},
 ) => {
-	// Start a one-shot server on a random port for each test suite
-	const server = Bun.serve({ port: 0, fetch: app })
-	const url = `http://localhost:${server.port}${path}`
+	// Start a one-shot Node HTTP server (Express uses Node HTTP, not Fetch API)
+	const server = http.createServer(app)
+	await new Promise<void>((resolve) => server.listen(0, resolve))
+	const { port } = server.address() as { port: number }
+	const url = `http://localhost:${port}${path}`
 
 	try {
 		const res = await fetch(url, opts)
 		return res
 	} finally {
-		server.stop(true)
+		await new Promise<void>((resolve) => server.close(() => resolve()))
 	}
 }
 
