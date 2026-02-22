@@ -5,14 +5,15 @@
   "type": "module",
   "description": "CREHub CRE workflow template — fork this and implement your handler.",
   "scripts": {
-    "simulate": "cre workflow simulate --target local-simulation",
-    "simulate:staging": "cre workflow simulate --target staging-settings",
+    "cre-compile": "bun build src/index.ts --outfile dist/index.js --target bun",
+    "simulate": "cre workflow simulate . --target local-simulation",
+    "simulate:staging": "cre workflow simulate . --target staging-settings",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "test:watch": "bun test --watch"
   },
   "dependencies": {
-    "@chainlink/cre-sdk": "file:../cre-sdk-typescript/packages/cre-sdk",
+    "@chainlink/cre-sdk": "^1.1.1",
     "zod": "3.25.76"
   },
   "devDependencies": {

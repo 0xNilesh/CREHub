@@ -60,12 +60,19 @@ export const runSimulate = async (workflowDir: string, input: unknown): Promise<
 	let stdout = ''
 	let stderr = ''
 
+	const target = process.env.CRE_TARGET ?? 'local-simulation'
+	const cmd = [
+		'cre workflow simulate',
+		workflowDir,
+		`--target ${target}`,
+		`--http-payload ./${HTTP_PAYLOAD_FILENAME}`,
+	].join(' ')
+
 	try {
-		const combined = execSync(`cre workflow simulate ${workflowDir}`, {
+		const combined = execSync(cmd, {
 			cwd: workflowDir,
 			timeout: SIMULATE_TIMEOUT_MS,
 			encoding: 'utf8',
-			// Merge stderr into stdout for log capture
 			stdio: ['pipe', 'pipe', 'pipe'],
 		})
 		stdout = combined
