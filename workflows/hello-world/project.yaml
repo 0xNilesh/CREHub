@@ -1,0 +1,24 @@
+# ==========================================================================
+# CRE PROJECT SETTINGS — hello-world
+# ==========================================================================
+# Defines RPC URLs per target. Referenced by cre workflow simulate/deploy.
+
+# --------------------------------------------------------------------------
+local-simulation:
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia
+      url: https://ethereum-sepolia-rpc.publicnode.com
+
+# --------------------------------------------------------------------------
+staging-settings:
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia
+      url: https://ethereum-sepolia-rpc.publicnode.com
+
+# --------------------------------------------------------------------------
+production-settings:
+  cre-cli:
+    don-family: "zone-a"
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia
+      url: https://ethereum-sepolia-rpc.publicnode.com
