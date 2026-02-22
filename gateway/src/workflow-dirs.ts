@@ -15,4 +15,5 @@ const ROOT = new URL('../..', import.meta.url).pathname.replace(/^\/([A-Z]:)/, '
 
 export const WORKFLOW_DIRS: Record<string, string> = {
 	wf_hello_world_01: path.join(ROOT, 'workflows', 'hello-world'),
+	wf_ta_signal_01:   path.join(ROOT, 'workflows', 'ta-signal'),
 }

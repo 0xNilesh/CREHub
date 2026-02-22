@@ -1,0 +1,26 @@
+{
+  "name": "@crehub/workflow-ta-signal",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CREHub TA Signal CRE workflow — AI-powered BUY/SELL/HOLD via TAAPI + OpenAI.",
+  "scripts": {
+    "cre-compile": "bun scripts/cre-compile.ts",
+    "simulate": "cre workflow simulate . --target local-simulation",
+    "simulate:staging": "cre workflow simulate . --target staging-settings",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "test:watch": "bun test --watch"
+  },
+  "dependencies": {
+    "@chainlink/cre-sdk": "^1.1.1",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.8",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "bun": ">=1.2.21"
+  }
+}

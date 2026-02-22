@@ -1,0 +1,27 @@
+# ==========================================================================
+# CRE WORKFLOW SETTINGS — ta-signal
+# ==========================================================================
+
+# --------------------------------------------------------------------------
+local-simulation:
+  user-workflow:
+    workflow-name: "crehub-ta-signal-local"
+  workflow-artifacts:
+    workflow-path: "./src/index.ts"
+    config-path: "./config.json"
+
+# --------------------------------------------------------------------------
+staging-settings:
+  user-workflow:
+    workflow-name: "crehub-ta-signal-staging"
+  workflow-artifacts:
+    workflow-path: "./src/index.ts"
+    config-path: "./config.json"
+
+# --------------------------------------------------------------------------
+production-settings:
+  user-workflow:
+    workflow-name: "crehub-ta-signal-production"
+  workflow-artifacts:
+    workflow-path: "./src/index.ts"
+    config-path: "./config.json"
