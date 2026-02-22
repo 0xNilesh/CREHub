@@ -2,49 +2,53 @@
  * CREHub Marketplace Backend API
  *
  * Routes:
- *   GET  /api/workflows                  → list all active listings
+ *   GET  /api/workflows                  → list all active listings from MongoDB
  *   GET  /api/workflows/search?q=<query> → semantic search
  *   GET  /api/workflows/:workflowId      → workflow detail
  *   POST /api/trigger/:workflowId        → proxy to x402 gateway
  *
  * Startup sequence:
- *   1. connectDb()                        — connect to MongoDB
+ *   1. connectDb()                        — connect to MongoDB (fatal if fails)
  *   2. bootstrap(registryAddress, index)  — sync existing on-chain workflows into MongoDB
  *   3. startListener(registryAddress, index) — watch WorkflowListed / WorkflowUpdated events
- *   4. cache.setReady(true)
- *   5. app.listen()
+ *   4. app.listen()
+ *
+ * All reads go directly to MongoDB — no in-memory cache.
  */
 import express, { type Request, type Response } from 'express'
 import cors from 'cors'
+import { getAllActive, getOne } from './db'
+import { SearchIndex, buildSearchText } from './search'
 import { RegistryReader } from './registry'
-import { SearchIndex } from './search'
-import { WorkflowCache } from './cache'
 import { proxyTrigger } from './gateway'
 import { toWorkflowResponse } from './types'
 
-// ─── App factory ──────────────────────────────────────────────────────────────
-// Accepts an injected cache so tests can seed their own data without a real DB.
+// ─── Module-level search index ────────────────────────────────────────────────
+// Rebuilt by listener.ts on every WorkflowListed / WorkflowUpdated event.
+// Exported so tests can seed it without MongoDB.
 
-export const createApp = (cache: WorkflowCache) => {
+export const searchIndex = new SearchIndex()
+
+// ─── App factory ──────────────────────────────────────────────────────────────
+
+export const createApp = () => {
 	const app = express()
 	app.use(cors())
 	app.use(express.json())
 
 	// ── Health ─────────────────────────────────────────────────────────────────
-	app.get('/health', async (_req: Request, res: Response) => {
-		const listings = await cache.getAll()
-		res.json({
-			status: 'ok',
-			timestamp: new Date().toISOString(),
-			cacheReady: cache.ready,
-			listingCount: listings.length,
-		})
+	app.get('/health', (_req: Request, res: Response) => {
+		res.json({ status: 'ok', timestamp: new Date().toISOString() })
 	})
 
 	// ── List all workflows ─────────────────────────────────────────────────────
 	app.get('/api/workflows', async (_req: Request, res: Response) => {
-		const listings = await cache.getAll()
-		res.json(listings.map(toWorkflowResponse))
+		try {
+			const listings = await getAllActive()
+			res.json(listings.map(toWorkflowResponse))
+		} catch (err) {
+			res.status(503).json({ error: 'Database unavailable' })
+		}
 	})
 
 	// ── Semantic search ────────────────────────────────────────────────────────
@@ -58,29 +62,31 @@ export const createApp = (cache: WorkflowCache) => {
 		const topK = Math.min(Number(req.query.limit ?? 5), 20)
 
 		try {
-			const hits = await cache.getIndex().query(q.trim(), topK)
+			const hits = await searchIndex.query(q.trim(), topK)
 			const results = (
 				await Promise.all(
 					hits.map(async (hit) => {
-						const listing = await cache.getOne(hit.id)
+						const listing = await getOne(hit.id)
 						if (!listing) return null
 						return { ...toWorkflowResponse(listing), score: hit.score }
 					}),
 				)
 			).filter(Boolean)
-
 			res.json(results)
 		} catch (err) {
-			const msg = err instanceof Error ? err.message : 'Search failed'
-			res.status(500).json({ error: msg })
+			res.status(503).json({ error: 'Database unavailable' })
 		}
 	})
 
 	// ── Workflow detail ────────────────────────────────────────────────────────
 	app.get('/api/workflows/:workflowId', async (req: Request, res: Response) => {
-		const listing = await cache.getOne(req.params.workflowId)
-		if (!listing) return res.status(404).json({ error: `Workflow '${req.params.workflowId}' not found` })
-		res.json(toWorkflowResponse(listing))
+		try {
+			const listing = await getOne(req.params.workflowId)
+			if (!listing) return res.status(404).json({ error: `Workflow '${req.params.workflowId}' not found` })
+			res.json(toWorkflowResponse(listing))
+		} catch (err) {
+			res.status(503).json({ error: 'Database unavailable' })
+		}
 	})
 
 	// ── Trigger proxy ──────────────────────────────────────────────────────────
@@ -95,29 +101,22 @@ if (process.env.NODE_ENV !== 'test') {
 	const registryAddress = process.env.WORKFLOW_REGISTRY_ADDRESS
 	const port = Number(process.env.PORT ?? 3000)
 
-	const index = new SearchIndex()
-	const reader = new RegistryReader(registryAddress)
-	const cache = new WorkflowCache(reader, index)
-
 	console.log('CREHub Backend — starting up...')
 
 	const start = async () => {
 		const { connectDb } = await import('./db')
 		await connectDb()
-		cache.setUseDb(true)
 
 		if (registryAddress) {
 			console.log(`  WorkflowRegistry: ${registryAddress}`)
 			const { bootstrap, startListener } = await import('./listener')
-			await bootstrap(registryAddress as `0x${string}`, index)
-			startListener(registryAddress as `0x${string}`, index)
+			await bootstrap(registryAddress as `0x${string}`, searchIndex)
+			startListener(registryAddress as `0x${string}`, searchIndex)
 		} else {
 			console.log('  WORKFLOW_REGISTRY_ADDRESS not set — skipping bootstrap and listener')
 		}
 
-		cache.setReady(true)
-
-		const app = createApp(cache)
+		const app = createApp()
 		app.listen(port, () => {
 			console.log(`CREHub Backend running on http://localhost:${port}`)
 			console.log('Routes:')

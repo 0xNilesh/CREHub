@@ -1,30 +1,15 @@
 /**
  * API route tests
  *
- * Uses a pre-seeded WorkflowCache (no chain, no DB, no model download).
- * POST /api/workflows/list is removed — workflow registration now happens
- * via on-chain events picked up by listener.ts.
+ * Mocks the db module so no real MongoDB connection is needed.
+ * Tests /health, /api/workflows, /api/workflows/search, /api/workflows/:workflowId
  */
-import { describe, expect, test, beforeAll } from 'bun:test'
+import { describe, expect, test, beforeAll, mock } from 'bun:test'
 import http from 'node:http'
-import { createApp } from '../src/index'
-import { WorkflowCache } from '../src/cache'
-import { SearchIndex, setEmbedder } from '../src/search'
 import type { WorkflowListing } from '../src/types'
 import type { Hex } from 'viem'
 
-// ─── Mock embedder ────────────────────────────────────────────────────────────
-
-// Fixed embedder: "defi" → [1,0,0], "data/price" → [0,1,0], others → [0,0,1]
-const mockEmbed = async (text: string): Promise<Float32Array> => {
-	const vec = new Float32Array(3)
-	if (text.toLowerCase().includes('defi')) vec[0] = 1
-	else if (text.toLowerCase().includes('data') || text.toLowerCase().includes('price')) vec[1] = 1
-	else vec[2] = 1
-	return vec
-}
-
-// ─── Test fixtures ────────────────────────────────────────────────────────────
+// ─── Mock db module (must be before createApp import) ─────────────────────────
 
 const MOCK_LISTINGS: WorkflowListing[] = [
 	{
@@ -38,10 +23,10 @@ const MOCK_LISTINGS: WorkflowListing[] = [
 			active: true,
 			registeredAt: 0n,
 		},
-		inputs: [{ name: 'walletAddress', fieldType: 'address', description: 'Wallet', required: true }],
+		inputs:  [{ name: 'walletAddress', fieldType: 'address', description: 'Wallet', required: true }],
 		outputs: [
 			{ name: 'healthFactor', fieldType: 'number', description: 'Health factor', required: true },
-			{ name: 'riskLevel', fieldType: 'string', description: 'Risk level', required: true },
+			{ name: 'riskLevel',    fieldType: 'string', description: 'Risk level',    required: true },
 		],
 	},
 	{
@@ -55,10 +40,36 @@ const MOCK_LISTINGS: WorkflowListing[] = [
 			active: true,
 			registeredAt: 0n,
 		},
-		inputs: [{ name: 'feedAddress', fieldType: 'address', description: 'Feed address', required: true }],
+		inputs:  [{ name: 'feedAddress', fieldType: 'address', description: 'Feed address', required: true }],
 		outputs: [{ name: 'price', fieldType: 'number', description: 'Latest price', required: true }],
 	},
 ]
+
+mock.module('../src/db', () => ({
+	getAllActive: async () => MOCK_LISTINGS,
+	getOne: async (workflowId: string) =>
+		MOCK_LISTINGS.find((l) => l.metadata.workflowId === workflowId) ?? null,
+	connectDb: async () => {},
+	closeDb:   async () => {},
+	upsertWorkflow:      async () => {},
+	updateWorkflowStatus: async () => {},
+}))
+
+// ─── Import app after mocks are in place ──────────────────────────────────────
+
+import { createApp, searchIndex } from '../src/index'
+import { setEmbedder } from '../src/search'
+import { buildSearchText } from '../src/search'
+
+// ─── Mock embedder ────────────────────────────────────────────────────────────
+
+const mockEmbed = async (text: string): Promise<Float32Array> => {
+	const vec = new Float32Array(3)
+	if (text.toLowerCase().includes('defi'))                                      vec[0] = 1
+	else if (text.toLowerCase().includes('data') || text.toLowerCase().includes('price')) vec[1] = 1
+	else                                                                          vec[2] = 1
+	return vec
+}
 
 // ─── HTTP test helper ─────────────────────────────────────────────────────────
 
@@ -83,22 +94,29 @@ let app: ReturnType<typeof createApp>
 
 beforeAll(async () => {
 	setEmbedder(mockEmbed)
-	const index = new SearchIndex()
-	const cache = new WorkflowCache(undefined, index)
-	await cache.seed(MOCK_LISTINGS)
-	app = createApp(cache)
+	await searchIndex.rebuild(
+		MOCK_LISTINGS.map((l) => ({
+			id: l.metadata.workflowId,
+			text: buildSearchText({
+				workflowId: l.metadata.workflowId,
+				description: l.metadata.description,
+				detailedDescription: l.metadata.detailedDescription,
+				category: l.metadata.category,
+			}),
+		})),
+	)
+	app = createApp()
 })
 
 // ─── GET /health ──────────────────────────────────────────────────────────────
 
 describe('GET /health', () => {
-	test('returns 200 with cacheReady=true and listingCount', async () => {
+	test('returns 200 with status ok', async () => {
 		const res = await fetchApp(app, '/health')
 		expect(res.status).toBe(200)
 		const body = (await res.json()) as Record<string, unknown>
 		expect(body.status).toBe('ok')
-		expect(body.cacheReady).toBe(true)
-		expect(body.listingCount).toBe(2)
+		expect(typeof body.timestamp).toBe('string')
 	})
 })
 
@@ -127,9 +145,7 @@ describe('GET /api/workflows', () => {
 	test('pricePerInvocation is serialised as string (bigint safe)', async () => {
 		const res = await fetchApp(app, '/api/workflows')
 		const body = (await res.json()) as Record<string, unknown>[]
-		for (const wf of body) {
-			expect(typeof wf.pricePerInvocation).toBe('string')
-		}
+		for (const wf of body) expect(typeof wf.pricePerInvocation).toBe('string')
 	})
 })
 
@@ -161,7 +177,7 @@ describe('GET /api/workflows/search', () => {
 		expect(body[0].workflowId).toBe('wf_price_feed_01')
 	})
 
-	test('respects limit query param (max 20)', async () => {
+	test('respects limit query param', async () => {
 		const res = await fetchApp(app, '/api/workflows/search?q=anything&limit=1')
 		const body = (await res.json()) as unknown[]
 		expect(body.length).toBeLessThanOrEqual(1)

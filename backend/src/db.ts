@@ -38,7 +38,9 @@ export const connectDb = async (): Promise<void> => {
 	const uri = process.env.MONGODB_URI
 	if (!uri) throw new Error('MONGODB_URI environment variable is not set')
 
-	_client = new MongoClient(uri)
+	// Bun TLS bug: checkServerIdentity receives a null peer cert on Atlas SRV
+	// connections, crashing node:tls. Supplying () => undefined skips the check.
+	_client = new MongoClient(uri, { checkServerIdentity: () => undefined })
 	await _client.connect()
 	_db = _client.db(DB_NAME)
 	await col().createIndex({ workflowId: 1 }, { unique: true })

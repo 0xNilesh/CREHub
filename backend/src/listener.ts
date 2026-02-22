@@ -58,6 +58,21 @@ export const bootstrap = async (address: Hex, index: SearchIndex): Promise<void>
 export const startListener = (address: Hex, index: SearchIndex): (() => void) => {
 	const client = getClient()
 
+	// Fallback: re-sync from chain every 30 s in case watchContractEvent
+	// misses events (RPC rate-limits, polling gaps, backend restarts).
+	const syncInterval = setInterval(async () => {
+		try {
+			const reader = new RegistryReader(address)
+			const listings = await reader.fetchAll()
+			if (listings.length > 0) {
+				await Promise.all(listings.map(upsertWorkflow))
+				await rebuildIndex(index)
+			}
+		} catch (err) {
+			console.error('[listener] Periodic sync error:', err)
+		}
+	}, 30_000)
+
 	const unwatchListed = client.watchContractEvent({
 		address,
 		abi: REGISTRY_ABI,
@@ -120,8 +135,24 @@ export const startListener = (address: Hex, index: SearchIndex): (() => void) =>
 		onError: (err) => console.error('[listener] WorkflowUpdated watch error:', err),
 	})
 
-	console.log('[listener] Watching WorkflowListed and WorkflowUpdated events')
+	// Immediate catch-up in case events were emitted between bootstrap and now
+	setImmediate(async () => {
+		try {
+			const reader = new RegistryReader(address)
+			const listings = await reader.fetchAll()
+			if (listings.length > 0) {
+				await Promise.all(listings.map(upsertWorkflow))
+				await rebuildIndex(index)
+				console.log(`[listener] Catch-up sync: ${listings.length} workflow(s) upserted`)
+			}
+		} catch (err) {
+			console.error('[listener] Catch-up sync error:', err)
+		}
+	})
+
+	console.log('[listener] Watching WorkflowListed and WorkflowUpdated events (+ 30s fallback sync)')
 	return () => {
+		clearInterval(syncInterval)
 		unwatchListed()
 		unwatchUpdated()
 	}
