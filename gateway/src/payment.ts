@@ -102,11 +102,13 @@ export interface PaymentVerifiedRequest extends Request {
 	workflowPrice?: bigint
 }
 
-export const createPaymentMiddleware = (getWorkflowPrice: (workflowId: string) => bigint) => {
+export const createPaymentMiddleware = (
+	getWorkflowPrice: (workflowId: string) => bigint | Promise<bigint>,
+) => {
 	return async (req: PaymentVerifiedRequest, res: Response, next: NextFunction) => {
 		const workflowId = req.params.workflowId
 		const txHash = req.headers['x-payment'] as string | undefined
-		const price = getWorkflowPrice(workflowId)
+		const price = await getWorkflowPrice(workflowId)
 		const platformWallet = process.env.PLATFORM_WALLET!
 
 		if (!txHash) {

@@ -55,7 +55,7 @@ describe('GET /health', () => {
 		const app = createApp()
 		const res = await fetchApp(app, '/health')
 		expect(res.status).toBe(200)
-		const body = await res.json()
+		const body = (await res.json()) as Record<string, unknown>
 		expect(body.status).toBe('ok')
 		expect(typeof body.timestamp).toBe('string')
 	})
@@ -99,7 +99,7 @@ describe('POST /trigger/:workflowId', () => {
 		})
 
 		expect(res.status).toBe(402)
-		const body = await res.json()
+		const body = (await res.json()) as { error: string; paymentDetails: Record<string, unknown> }
 		expect(body.error).toBe('Payment required')
 		expect(body.paymentDetails).toBeDefined()
 		expect(body.paymentDetails.chainId).toBe(11155111)
@@ -115,7 +115,7 @@ describe('POST /trigger/:workflowId', () => {
 			body: JSON.stringify({}),
 		})
 
-		const body = await res.json()
+		const body = (await res.json()) as { paymentDetails: Record<string, unknown> }
 		expect(body.paymentDetails.amount).toBe('10000')
 	})
 
@@ -144,7 +144,7 @@ describe('POST /trigger/:workflowId', () => {
 			body: JSON.stringify({}),
 		})
 
-		const body = await res.json()
+		const body = (await res.json()) as { paymentDetails: Record<string, unknown> }
 		expect(body.paymentDetails.network).toBe('ethereum-sepolia')
 		expect(body.paymentDetails.payTo).toBeTruthy()
 		expect(body.paymentDetails.token).toBeTruthy()
