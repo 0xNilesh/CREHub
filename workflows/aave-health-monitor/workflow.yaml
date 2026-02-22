@@ -1,0 +1,27 @@
+# ==========================================================================
+# CRE WORKFLOW SETTINGS — aave-health-monitor
+# ==========================================================================
+
+# --------------------------------------------------------------------------
+local-simulation:
+  user-workflow:
+    workflow-name: "crehub-aave-health-monitor-local"
+  workflow-artifacts:
+    workflow-path: "./src/index.ts"
+    config-path: "./config.json"
+
+# --------------------------------------------------------------------------
+staging-settings:
+  user-workflow:
+    workflow-name: "crehub-aave-health-monitor-staging"
+  workflow-artifacts:
+    workflow-path: "./src/index.ts"
+    config-path: "./config.json"
+
+# --------------------------------------------------------------------------
+production-settings:
+  user-workflow:
+    workflow-name: "crehub-aave-health-monitor-production"
+  workflow-artifacts:
+    workflow-path: "./src/index.ts"
+    config-path: "./config.json"

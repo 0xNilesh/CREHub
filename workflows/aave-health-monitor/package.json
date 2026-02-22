@@ -1,9 +1,9 @@
 {
-  "name": "@crehub/workflow-hello-world",
+  "name": "@crehub/workflow-aave-health-monitor",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "CREHub hello-world CRE workflow — greets by name.",
+  "description": "CREHub Aave health factor monitor — liquidation prevention via Chainlink Price Feeds and x402 agent payments.",
   "scripts": {
     "cre-compile": "bun scripts/cre-compile.ts",
     "simulate": "PATH=$HOME/.cre/bin:$PATH cre workflow simulate . --target local-simulation --http-payload @http_trigger_payload.json --non-interactive --trigger-index 0",
