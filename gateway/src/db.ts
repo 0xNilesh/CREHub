@@ -14,6 +14,7 @@
  */
 import { MongoClient, type Collection, type Db } from 'mongodb'
 import type { WorkflowMetadata } from './types'
+import { WORKFLOW_DIRS } from './workflow-dirs'
 
 const DB_NAME = 'crehub'
 const COLLECTION = 'workflows'
@@ -47,7 +48,9 @@ export const connectDb = async (): Promise<void> => {
 	const uri = process.env.MONGODB_URI
 	if (!uri) throw new Error('MONGODB_URI environment variable is not set')
 
-	_client = new MongoClient(uri)
+	// Bun TLS bug: checkServerIdentity receives a null peer cert on Atlas SRV
+	// connections, crashing node:tls. Supplying () => undefined skips the check.
+	_client = new MongoClient(uri, { checkServerIdentity: () => undefined })
 	await _client.connect()
 	_db = _client.db(DB_NAME)
 	console.log('[gateway/db] Connected to MongoDB')
@@ -80,8 +83,8 @@ const fromDocument = (doc: WorkflowDocument, defaultWorkflowDir: string): Workfl
 		description: f.description,
 		required: f.required,
 	})),
-	// Use doc-level override if set, otherwise fall back to server default
-	workflowDir: doc.workflowDir || defaultWorkflowDir,
+	// Priority: static WORKFLOW_DIRS map → doc-level override → server default
+	workflowDir: WORKFLOW_DIRS[doc.workflowId] ?? doc.workflowDir ?? defaultWorkflowDir,
 })
 
 // ─── Read ─────────────────────────────────────────────────────────────────────

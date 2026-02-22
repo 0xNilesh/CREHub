@@ -12,7 +12,7 @@ import { execSync } from 'node:child_process'
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { tmpdir } from 'node:os'
+import { tmpdir, homedir } from 'node:os'
 import type { SimulateResult } from './types'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -64,9 +64,16 @@ export const runSimulate = async (workflowDir: string, input: unknown): Promise<
 	const cmd = [
 		'cre workflow simulate',
 		workflowDir,
-		`--target ${target}`,
+		`--target ${target} --broadcast`,
 		`--http-payload ./${HTTP_PAYLOAD_FILENAME}`,
 	].join(' ')
+
+	// Ensure ~/.cre/bin (CRE CLI install location) is on PATH
+	const creBin = join(homedir(), '.cre', 'bin')
+	const env = {
+		...process.env,
+		PATH: `${creBin}:${process.env.PATH ?? ''}`,
+	}
 
 	try {
 		const combined = execSync(cmd, {
@@ -74,6 +81,8 @@ export const runSimulate = async (workflowDir: string, input: unknown): Promise<
 			timeout: SIMULATE_TIMEOUT_MS,
 			encoding: 'utf8',
 			stdio: ['pipe', 'pipe', 'pipe'],
+			shell: '/bin/zsh',
+			env,
 		})
 		stdout = combined
 	} catch (err: unknown) {

@@ -3,18 +3,16 @@
  *
  * Routes:
  *   GET  /health                    → health check
- *   GET  /workflows                 → list workflows from MongoDB (or in-memory in tests)
+ *   GET  /workflows                 → list workflows from MongoDB
  *   POST /trigger/:workflowId       → x402-gated workflow execution
  *
- * Startup sequence (production):
- *   1. connectDb()   — connect to the shared MongoDB instance
+ * All workflow lookups go directly to MongoDB — no in-memory registry.
+ *
+ * Startup sequence:
+ *   1. connectDb() — connect to the shared MongoDB instance
  *   2. app.listen()
  *
- * Workflows are written to MongoDB by the backend's event listener when
- * WorkflowListed events are emitted on-chain. The gateway is read-only.
- *
- * In tests: call registerWorkflow() to seed the in-memory registry,
- * which is used when _useDb = false (the default).
+ * In tests: mock the db module to provide workflow data without MongoDB.
  */
 import express, { type Request, type Response } from 'express'
 import { createPaymentMiddleware, holdAndExecute, type PaymentVerifiedRequest } from './payment'
@@ -22,38 +20,21 @@ import { LoggingSettlementClient } from './settlement'
 import type { WorkflowMetadata } from './types'
 
 // ─── Default workflow directory ───────────────────────────────────────────────
-// All workflows share this directory for `cre simulate` unless overridden per-doc.
 
 const WORKFLOW_DIR = () =>
 	process.env.WORKFLOW_DIR ??
 	new URL('../../cre-workflow-template', import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1')
 
-// ─── In-memory registry (used in tests and as fallback) ───────────────────────
-
-const _registry = new Map<string, WorkflowMetadata>()
-let _useDb = false
-
-/** Register a workflow in the in-memory registry (test helper). */
-export const registerWorkflow = (metadata: WorkflowMetadata): void => {
-	_registry.set(metadata.workflowId, metadata)
-}
-
-// ─── Lookup helpers ───────────────────────────────────────────────────────────
+// ─── Lookup helpers (always MongoDB) ─────────────────────────────────────────
 
 const findWorkflow = async (workflowId: string): Promise<WorkflowMetadata | null> => {
-	if (_useDb) {
-		const { getOne } = await import('./db')
-		return getOne(workflowId, WORKFLOW_DIR())
-	}
-	return _registry.get(workflowId) ?? null
+	const { getOne } = await import('./db')
+	return getOne(workflowId, WORKFLOW_DIR())
 }
 
 const listWorkflows = async (): Promise<WorkflowMetadata[]> => {
-	if (_useDb) {
-		const { getAllActive } = await import('./db')
-		return getAllActive(WORKFLOW_DIR())
-	}
-	return [..._registry.values()]
+	const { getAllActive } = await import('./db')
+	return getAllActive(WORKFLOW_DIR())
 }
 
 const getWorkflowPrice = async (workflowId: string): Promise<bigint> => {
@@ -79,9 +60,13 @@ export const createApp = () => {
 
 	// ── List workflows ────────────────────────────────────────────────────────
 	app.get('/workflows', async (_req: Request, res: Response) => {
-		const workflows = await listWorkflows()
-		// Strip workflowDir — it is a server-side field, not exposed to callers
-		res.json(workflows.map(({ workflowDir: _, ...rest }) => rest))
+		try {
+			const workflows = await listWorkflows()
+			// Strip workflowDir — server-side field, not exposed to callers
+			res.json(workflows.map(({ workflowDir: _, ...rest }) => rest))
+		} catch (err) {
+			res.status(503).json({ error: 'Database unavailable' })
+		}
 	})
 
 	// ── Trigger workflow ──────────────────────────────────────────────────────
@@ -91,7 +76,13 @@ export const createApp = () => {
 		async (req: PaymentVerifiedRequest, res: Response) => {
 			const { workflowId } = req.params
 
-			const metadata = await findWorkflow(workflowId)
+			let metadata: WorkflowMetadata | null
+			try {
+				metadata = await findWorkflow(workflowId)
+			} catch {
+				return res.status(503).json({ error: 'Database unavailable' })
+			}
+
 			if (!metadata) {
 				return res.status(404).json({ error: `Workflow '${workflowId}' not found` })
 			}
@@ -130,7 +121,6 @@ if (process.env.NODE_ENV !== 'test') {
 	const start = async () => {
 		const { connectDb } = await import('./db')
 		await connectDb()
-		_useDb = true
 
 		const app = createApp()
 		app.listen(port, () => {
