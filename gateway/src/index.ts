@@ -16,7 +16,7 @@
  */
 import express, { type Request, type Response } from 'express'
 import { createPaymentMiddleware, holdAndExecute, type PaymentVerifiedRequest } from './payment'
-import { LoggingSettlementClient } from './settlement'
+import { ContractSettlementClient, LoggingSettlementClient } from './settlement'
 import type { WorkflowMetadata } from './types'
 
 // ─── Default workflow directory ───────────────────────────────────────────────
@@ -44,8 +44,11 @@ const getWorkflowPrice = async (workflowId: string): Promise<bigint> => {
 }
 
 // ─── Settlement client ────────────────────────────────────────────────────────
+// Use real contract client when vault address is configured, else log-only demo.
 
-const settlement = new LoggingSettlementClient()
+const settlement = process.env.SETTLEMENT_VAULT_ADDRESS
+	? new ContractSettlementClient()
+	: new LoggingSettlementClient()
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 
