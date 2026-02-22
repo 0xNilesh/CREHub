@@ -20,11 +20,11 @@
     "remark-gfm": "^4.0.1",
     "swr": "^2.3.3",
     "use-debounce": "^10.0.4",
-    "viem": "2.34.0",
+    "viem": "^2.37.0",
     "wagmi": "2.19.5"
   },
   "overrides": {
-    "viem": "2.34.0"
+    "viem": "^2.37.0"
   },
   "devDependencies": {
     "@types/node": "^20",
