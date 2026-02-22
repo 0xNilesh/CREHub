@@ -52,3 +52,38 @@ export const formatPrice = (wei: string): string => {
 /** Shorten an EVM address: 0x1234…abcd */
 export const shortAddr = (addr: string): string =>
   addr ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : ''
+
+/** Shorten a tx/execution hash */
+export const shortHash = (hash: string): string =>
+  hash ? `${hash.slice(0, 10)}…${hash.slice(-6)}` : '—'
+
+export const SEPOLIA_EXPLORER = 'https://sepolia.etherscan.io'
+
+// ─── Execution (explorer / dashboard) ────────────────────────────────────────
+
+export interface Execution {
+  executionId:      string
+  workflowId:       string
+  agentAddress:     string
+  creatorAddress:   string
+  amount:           string
+  inputsJson:       string
+  outputsJson:      string
+  errorMessage:     string
+  status:           'pending' | 'success' | 'failure'
+  paymentTxHash:    string
+  settlementTxHash: string
+  triggeredAt:      string
+  settledAt:        string | null
+}
+
+export interface ExecutionsPage {
+  items: Execution[]
+  total: number
+}
+
+export const formatUSDC = (wei: string): string => {
+  const n = Number(wei)
+  if (isNaN(n) || n === 0) return '$0'
+  return `$${(n / 1_000_000).toFixed(4)}`
+}

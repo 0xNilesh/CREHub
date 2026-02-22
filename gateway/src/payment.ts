@@ -131,6 +131,18 @@ export const createPaymentMiddleware = (
 				return res.status(402).json({ error: verification.error })
 			}
 
+			// Atomically mark the tx hash as consumed — prevents replay attacks.
+			const { markPaymentUsed } = await import('./db')
+			const fresh = await markPaymentUsed({
+				txHash:       txHash,
+				workflowId,
+				agentAddress: verification.from as string,
+				amount:       price.toString(),
+			})
+			if (!fresh) {
+				return res.status(402).json({ error: 'Payment already consumed — tx hash already used' })
+			}
+
 			req.agentAddress = verification.from
 			req.workflowPrice = price
 			next()
@@ -144,6 +156,16 @@ export const createPaymentMiddleware = (
 // ─── holdAndExecute ───────────────────────────────────────────────────────────
 // After payment verified: escrow → simulate → settle
 
+// Lazy-load db helpers (avoids import-time DB connection requirement in tests)
+const _dbSave = async (...args: Parameters<typeof import('./db').saveExecution>) => {
+	const { saveExecution } = await import('./db')
+	return saveExecution(...args)
+}
+const _dbSettle = async (...args: Parameters<typeof import('./db').settleExecution>) => {
+	const { settleExecution } = await import('./db')
+	return settleExecution(...args)
+}
+
 export const holdAndExecute = async (params: {
 	workflowId: string
 	workflowDir: string
@@ -151,8 +173,11 @@ export const holdAndExecute = async (params: {
 	creatorAddress: Hex
 	amount: bigint
 	input: unknown
+	paymentTxHash?: string
 	settlement: SettlementClient
 	simulate?: typeof runSimulate
+	dbSave?: typeof _dbSave
+	dbSettle?: typeof _dbSettle
 }): Promise<ExecutionResult> => {
 	const {
 		workflowId,
@@ -161,19 +186,39 @@ export const holdAndExecute = async (params: {
 		creatorAddress,
 		amount,
 		input,
+		paymentTxHash = '',
 		settlement,
 		simulate = runSimulate,
+		dbSave = _dbSave,
+		dbSettle = _dbSettle,
 	} = params
 
 	const inputsJson = JSON.stringify(input)
 
-	// 1. Create on-chain escrow (emits ExecutionTriggered — explorer shows "pending")
+	// 1. Create on-chain escrow (emits ExecutionTriggered)
 	const executionId = await settlement.createEscrow({
 		workflowId,
 		agentAddress,
 		creatorAddress,
 		amount,
 		inputsJson,
+	})
+
+	// Persist pending execution record
+	await dbSave({
+		executionId,
+		workflowId,
+		agentAddress,
+		creatorAddress,
+		amount: amount.toString(),
+		inputsJson,
+		outputsJson:      '',
+		errorMessage:     '',
+		status:           'pending',
+		paymentTxHash,
+		settlementTxHash: '',
+		triggeredAt:      new Date(),
+		settledAt:        null,
 	})
 
 	// 2. Run `cre workflow simulate`
@@ -183,19 +228,20 @@ export const holdAndExecute = async (params: {
 	} catch (err) {
 		const errorMessage = err instanceof Error ? err.message : 'Simulation process error'
 		const tx = await settlement.settleFailure({ executionId, errorMessage })
+		await dbSettle(executionId, { status: 'failure', outputsJson: '', errorMessage, settlementTxHash: tx })
 		return { success: false, output: null, error: errorMessage, settlementTx: tx }
 	}
 
-	// 3. Settle on-chain (emits ExecutionSettled — explorer shows final state)
+	// 3. Settle on-chain
 	if (simulateResult.success) {
-		const tx = await settlement.settleSuccess({
-			executionId,
-			outputsJson: JSON.stringify(simulateResult.output),
-		})
+		const outputsJson = JSON.stringify(simulateResult.output)
+		const tx = await settlement.settleSuccess({ executionId, outputsJson })
+		await dbSettle(executionId, { status: 'success', outputsJson, errorMessage: '', settlementTxHash: tx })
 		return { success: true, output: simulateResult.output, settlementTx: tx }
 	} else {
 		const errorMessage = simulateResult.error ?? 'simulation failed'
 		const tx = await settlement.settleFailure({ executionId, errorMessage })
+		await dbSettle(executionId, { status: 'failure', outputsJson: '', errorMessage, settlementTxHash: tx })
 		return { success: false, output: null, error: errorMessage, settlementTx: tx }
 	}
 }

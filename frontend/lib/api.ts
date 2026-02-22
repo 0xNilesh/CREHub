@@ -1,4 +1,4 @@
-import type { Workflow, SearchResult } from './types'
+import type { Workflow, SearchResult, Execution, ExecutionsPage } from './types'
 
 const BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:4000'
 
@@ -190,4 +190,18 @@ export const api = {
     const body = await res.json()
     return { status: res.status, body }
   },
+
+  // ── Explorer / Dashboard ──────────────────────────────────────────────────
+
+  getExecutions: (params: { page?: number; limit?: number; workflowId?: string; agentAddress?: string } = {}) => {
+    const qs = new URLSearchParams()
+    if (params.page)         qs.set('page',         String(params.page))
+    if (params.limit)        qs.set('limit',        String(params.limit))
+    if (params.workflowId)   qs.set('workflowId',   params.workflowId)
+    if (params.agentAddress) qs.set('agentAddress', params.agentAddress)
+    return req<ExecutionsPage>(`/api/executions?${qs}`)
+  },
+
+  getExecution: (executionId: string) =>
+    req<Execution>(`/api/executions/${executionId}`),
 }

@@ -154,8 +154,11 @@ describe('holdAndExecute', () => {
 			creatorAddress: PLATFORM_WALLET as Hex,
 			amount: PRICE,
 			input: { walletAddress: AGENT_WALLET },
+			paymentTxHash: '0xpaymenttx',
 			settlement: mockSettlement,
 			simulate: mockSimulate,
+			dbSave: async () => {},
+			dbSettle: async () => {},
 		})
 
 		expect(calls).toContain('createEscrow')
@@ -199,8 +202,11 @@ describe('holdAndExecute', () => {
 			creatorAddress: PLATFORM_WALLET as Hex,
 			amount: PRICE,
 			input: {},
+			paymentTxHash: '0xpaymenttx',
 			settlement: mockSettlement,
 			simulate: mockSimulate,
+			dbSave: async () => {},
+			dbSettle: async () => {},
 		})
 
 		expect(calls).toContain('createEscrow')

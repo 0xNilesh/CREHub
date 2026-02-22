@@ -1,7 +1,8 @@
 /**
  * Embedding-based semantic search.
  *
- * Uses @xenova/transformers (all-MiniLM-L6-v2) to embed workflow text.
+ * Uses 
+ * 
  * The model is lazy-loaded on first query (cached to disk by transformers).
  *
  * For testing: inject a deterministic embedder via setEmbedder().

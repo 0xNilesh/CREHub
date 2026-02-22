@@ -13,7 +13,7 @@
  * --non-interactive, while the identical command completes in ~4s under
  * PowerShell. spawnSync with explicit args avoids any shell-escaping issues.
  */
-import { spawnSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
@@ -21,7 +21,7 @@ import type { SimulateResult } from './types'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const SIMULATE_TIMEOUT_MS = 120_000 // 120 s
+const SIMULATE_TIMEOUT_MS = 300_000 // 5 min (cre-compile can be slow first run)
 const HTTP_PAYLOAD_FILENAME = 'http_trigger_payload.json'
 
 // ─── Output parser ────────────────────────────────────────────────────────────
@@ -106,35 +106,72 @@ export const runSimulate = async (workflowDir: string, input: unknown): Promise<
 		'--http-payload', `./${HTTP_PAYLOAD_FILENAME}`,
 	]
 
-	// On Windows: invoke via powershell.exe to avoid cmd.exe hanging behaviour.
-	// On Unix: invoke cre directly via spawnSync (no shell needed).
-	const proc = isWin
-		? spawnSync('powershell.exe', ['-NonInteractive', '-NoProfile', '-Command', `cre ${creArgs.join(' ')}`], {
-				cwd: workflowDir,
-				timeout: SIMULATE_TIMEOUT_MS,
-				encoding: 'utf8' as const,
-				stdio: ['pipe', 'pipe', 'pipe'],
-				env,
+	// On Windows: invoke via powershell.exe (cmd.exe hangs indefinitely).
+	// Use async spawn so we can stream output and see where a hang occurs.
+	const [exe, args] = isWin
+		? ['powershell.exe', ['-NonInteractive', '-NoProfile', '-Command', `cre ${creArgs.join(' ')}`]]
+		: ['cre', creArgs]
+
+	console.log(`[simulate] cwd=${workflowDir}`)
+	console.log(`[simulate] cmd=${exe} ${args.join(' ')}`)
+
+	return new Promise<SimulateResult>((resolve) => {
+		const proc = spawn(exe, args, {
+			cwd: workflowDir,
+			stdio: ['pipe', 'pipe', 'pipe'],
+			env,
+		})
+
+		let stdout = ''
+		let stderr = ''
+
+		proc.stdout.on('data', (chunk: Buffer) => {
+			const text = chunk.toString()
+			process.stdout.write(`[simulate:out] ${text}`)
+			stdout += text
+		})
+		proc.stderr.on('data', (chunk: Buffer) => {
+			const text = chunk.toString()
+			process.stderr.write(`[simulate:err] ${text}`)
+			stderr += text
+		})
+
+		const timer = setTimeout(() => {
+			console.error(`[simulate] TIMEOUT after ${SIMULATE_TIMEOUT_MS / 1000}s`)
+			console.error(`[simulate] stdout so far:\n${stdout}`)
+			console.error(`[simulate] stderr so far:\n${stderr}`)
+			proc.kill('SIGKILL')
+			resolve({
+				success: false,
+				output: null,
+				error: `simulate timed out after ${SIMULATE_TIMEOUT_MS / 1000}s`,
+				logs: [...stdout.split('\n'), ...stderr.split('\n')].filter(Boolean),
 			})
-		: spawnSync('cre', creArgs, {
-				cwd: workflowDir,
-				timeout: SIMULATE_TIMEOUT_MS,
-				encoding: 'utf8' as const,
-				stdio: ['pipe', 'pipe', 'pipe'],
-				env,
+		}, SIMULATE_TIMEOUT_MS)
+
+		proc.on('error', (err) => {
+			clearTimeout(timer)
+			resolve({
+				success: false,
+				output: null,
+				error: err.message,
+				logs: [...stdout.split('\n'), ...stderr.split('\n')].filter(Boolean),
 			})
+		})
 
-	const stdout = proc.stdout ?? ''
-	const stderr = proc.stderr ?? ''
-
-	if (proc.error || proc.status !== 0) {
-		return {
-			success: false,
-			output: null,
-			error: stderr || proc.error?.message || `simulate exited with code ${proc.status}`,
-			logs: [...stdout.split('\n'), ...stderr.split('\n')].filter(Boolean),
-		}
-	}
-
-	return parseSimulateOutput(stdout)
+		proc.on('close', (code) => {
+			clearTimeout(timer)
+			console.log(`[simulate] exited code=${code}`)
+			if (code !== 0) {
+				resolve({
+					success: false,
+					output: null,
+					error: stderr || `simulate exited with code ${code}`,
+					logs: [...stdout.split('\n'), ...stderr.split('\n')].filter(Boolean),
+				})
+			} else {
+				resolve(parseSimulateOutput(stdout))
+			}
+		})
+	})
 }

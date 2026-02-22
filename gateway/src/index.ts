@@ -102,6 +102,7 @@ export const createApp = () => {
 					creatorAddress: metadata.creatorAddress,
 					amount: req.workflowPrice!,
 					input: req.body,
+					paymentTxHash: req.headers['x-payment'] as string,
 					settlement,
 				})
 				return res.status(200).json(result)

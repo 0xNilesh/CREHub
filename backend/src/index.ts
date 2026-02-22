@@ -17,7 +17,7 @@
  */
 import express, { type Request, type Response } from 'express'
 import cors from 'cors'
-import { getAllActive, getOne } from './db'
+import { getAllActive, getOne, getExecutions, getExecutionById } from './db'
 import { SearchIndex, buildSearchText } from './search'
 import { RegistryReader } from './registry'
 import { proxyTrigger } from './gateway'
@@ -91,6 +91,32 @@ export const createApp = () => {
 
 	// ── Trigger proxy ──────────────────────────────────────────────────────────
 	app.post('/api/trigger/:workflowId', proxyTrigger)
+
+	// ── Explorer: all executions (paginated, filterable) ───────────────────────
+	// GET /api/executions?page=1&limit=20&workflowId=wf_xxx&agentAddress=0x...
+	app.get('/api/executions', async (req: Request, res: Response) => {
+		try {
+			const page    = Math.max(1, Number(req.query.page  ?? 1))
+			const limit   = Math.min(50, Math.max(1, Number(req.query.limit ?? 20)))
+			const workflowId   = req.query.workflowId   as string | undefined
+			const agentAddress = req.query.agentAddress as string | undefined
+			const result = await getExecutions({ page, limit, workflowId, agentAddress })
+			res.json(result)
+		} catch {
+			res.status(503).json({ error: 'Database unavailable' })
+		}
+	})
+
+	// ── Explorer: single execution detail ─────────────────────────────────────
+	app.get('/api/executions/:executionId', async (req: Request, res: Response) => {
+		try {
+			const doc = await getExecutionById(req.params.executionId)
+			if (!doc) return res.status(404).json({ error: 'Execution not found' })
+			res.json(doc)
+		} catch {
+			res.status(503).json({ error: 'Database unavailable' })
+		}
+	})
 
 	return app
 }

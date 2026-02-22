@@ -1,11 +1,30 @@
 /**
  * Phase 2 – simulate.ts tests
  *
- * Tests parseSimulateOutput (pure, no subprocess) and runSimulate (mocked execSync).
+ * Tests parseSimulateOutput (pure, no subprocess) and runSimulate (mocked spawn).
  */
-import { describe, expect, test, spyOn, beforeEach, afterEach } from 'bun:test'
+import { describe, expect, test, spyOn } from 'bun:test'
+import { EventEmitter } from 'node:events'
 import { parseSimulateOutput } from '../src/simulate'
 import * as childProcess from 'node:child_process'
+
+// ─── spawn mock helper ────────────────────────────────────────────────────────
+
+function makeSpawnMock(stdout: string, stderr: string, exitCode: number) {
+	const proc = new EventEmitter() as any
+	proc.stdout = new EventEmitter()
+	proc.stderr = new EventEmitter()
+	proc.kill  = () => {}
+
+	// Emit data + close on next tick so listeners are attached first
+	setTimeout(() => {
+		if (stdout) proc.stdout.emit('data', Buffer.from(stdout))
+		if (stderr) proc.stderr.emit('data', Buffer.from(stderr))
+		proc.emit('close', exitCode)
+	}, 0)
+
+	return proc
+}
 
 // ─── parseSimulateOutput ───────────────────────────────────────────────────────
 
@@ -81,17 +100,10 @@ describe('parseSimulateOutput', () => {
 
 describe('runSimulate', () => {
 	test('returns parsed output on successful cre simulate', async () => {
-		// Mock spawnSync to return workflow output
 		const mockOutput = '{"healthFactor":2.4,"riskLevel":"safe"}'
-		const spy = spyOn(childProcess, 'spawnSync').mockReturnValue({
-			stdout: mockOutput,
-			stderr: '',
-			status: 0,
-			pid: 0,
-			output: [],
-			signal: null,
-			error: undefined,
-		} as any)
+		const spy = spyOn(childProcess, 'spawn').mockReturnValue(
+			makeSpawnMock(mockOutput, '', 0) as any,
+		)
 
 		const { runSimulate } = await import('../src/simulate')
 		const result = await runSimulate('/tmp/fake-workflow', { walletAddress: '0x1234' })
@@ -102,16 +114,10 @@ describe('runSimulate', () => {
 		spy.mockRestore()
 	})
 
-	test('returns success=false when spawnSync returns non-zero exit', async () => {
-		const spy = spyOn(childProcess, 'spawnSync').mockReturnValue({
-			stdout: '',
-			stderr: 'Error: workflow handler threw an exception',
-			status: 1,
-			pid: 0,
-			output: [],
-			signal: null,
-			error: undefined,
-		} as any)
+	test('returns success=false when spawn exits non-zero', async () => {
+		const spy = spyOn(childProcess, 'spawn').mockReturnValue(
+			makeSpawnMock('', 'Error: workflow handler threw an exception', 1) as any,
+		)
 
 		const { runSimulate } = await import('../src/simulate')
 		const result = await runSimulate('/tmp/fake-workflow', { walletAddress: '0x1234' })
@@ -123,15 +129,9 @@ describe('runSimulate', () => {
 	})
 
 	test('returns success=false when output has no JSON', async () => {
-		const spy = spyOn(childProcess, 'spawnSync').mockReturnValue({
-			stdout: 'Starting...\nCompiling...\nDone.',
-			stderr: '',
-			status: 0,
-			pid: 0,
-			output: [],
-			signal: null,
-			error: undefined,
-		} as any)
+		const spy = spyOn(childProcess, 'spawn').mockReturnValue(
+			makeSpawnMock('Starting...\nCompiling...\nDone.', '', 0) as any,
+		)
 
 		const { runSimulate } = await import('../src/simulate')
 		const result = await runSimulate('/tmp/fake-workflow', {})

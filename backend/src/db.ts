@@ -8,8 +8,27 @@ import { MongoClient, type Collection, type Db } from 'mongodb'
 import type { WorkflowListing } from './types'
 import type { Hex } from 'viem'
 
-const DB_NAME = 'crehub'
-const COLLECTION = 'workflows'
+const DB_NAME             = 'crehub'
+const COLLECTION          = 'workflows'
+const EXECUTIONS_COLLECTION = 'executions'
+
+// ─── Execution document (written by gateway, read by backend) ─────────────────
+
+export interface ExecutionDocument {
+	executionId:      string
+	workflowId:       string
+	agentAddress:     string
+	creatorAddress:   string
+	amount:           string  // USDC wei
+	inputsJson:       string
+	outputsJson:      string
+	errorMessage:     string
+	status:           'pending' | 'success' | 'failure'
+	paymentTxHash:    string
+	settlementTxHash: string
+	triggeredAt:      Date
+	settledAt:        Date | null
+}
 
 export interface WorkflowDocument {
 	workflowId: string
@@ -30,6 +49,11 @@ let _db: Db | undefined
 const col = (): Collection<WorkflowDocument> => {
 	if (!_db) throw new Error('DB not connected — call connectDb() first')
 	return _db.collection<WorkflowDocument>(COLLECTION)
+}
+
+const executionsCol = (): Collection<ExecutionDocument> => {
+	if (!_db) throw new Error('DB not connected — call connectDb() first')
+	return _db.collection<ExecutionDocument>(EXECUTIONS_COLLECTION)
 }
 
 // ─── Connection ───────────────────────────────────────────────────────────────
@@ -107,4 +131,37 @@ export const getAllActive = async (): Promise<WorkflowListing[]> => {
 export const getOne = async (workflowId: string): Promise<WorkflowListing | null> => {
 	const doc = await col().findOne({ workflowId })
 	return doc ? fromDocument(doc) : null
+}
+
+// ─── Execution reads ──────────────────────────────────────────────────────────
+
+const stripId = ({ _id, ...rest }: any) => rest
+
+export const getExecutions = async (opts: {
+	page?: number
+	limit?: number
+	workflowId?: string
+	agentAddress?: string
+}): Promise<{ items: ExecutionDocument[]; total: number }> => {
+	const { page = 1, limit = 20, workflowId, agentAddress } = opts
+	const filter: Record<string, unknown> = {}
+	if (workflowId)   filter.workflowId  = workflowId
+	if (agentAddress) filter.agentAddress = { $regex: new RegExp(`^${agentAddress}$`, 'i') }
+
+	const skip = (page - 1) * limit
+	const [items, total] = await Promise.all([
+		executionsCol()
+			.find(filter)
+			.sort({ triggeredAt: -1 })
+			.skip(skip)
+			.limit(limit)
+			.toArray(),
+		executionsCol().countDocuments(filter),
+	])
+	return { items: items.map(stripId), total }
+}
+
+export const getExecutionById = async (executionId: string): Promise<ExecutionDocument | null> => {
+	const doc = await executionsCol().findOne({ executionId })
+	return doc ? stripId(doc) : null
 }

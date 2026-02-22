@@ -7,6 +7,8 @@ import { useState, useEffect } from 'react'
 
 const NAV_LINKS = [
   { href: '/browse',          label: 'Browse' },
+  { href: '/explorer',        label: 'Explorer' },
+  { href: '/dashboard',       label: 'Dashboard' },
   { href: '/list',            label: 'List Workflow' },
   { href: '/crehub/openclaw', label: 'Agent Skills' },
 ]
