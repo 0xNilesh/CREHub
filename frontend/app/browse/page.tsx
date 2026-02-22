@@ -11,7 +11,7 @@ import { api } from '@/lib/api'
 import type { Workflow, SearchResult, Category } from '@/lib/types'
 import { CATEGORY_LABELS } from '@/lib/types'
 
-const CATEGORIES: Category[] = ['all', 'defi', 'monitoring', 'data', 'compute']
+const CATEGORIES: Category[] = ['all', 'defi', 'monitoring', 'data', 'compute', 'ai']
 
 export default function BrowsePage() {
   const [query,    setQuery]    = useState('')
@@ -112,7 +112,7 @@ export default function BrowsePage() {
         )}
 
         {/* ── Grid ──────────────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 auto-rows-fr">
           {loading
             ? Array.from({ length: 6 }).map((_, i) => <WorkflowCardSkeleton key={i} />)
             : items.length === 0

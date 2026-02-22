@@ -11,7 +11,7 @@ export interface Workflow {
   pricePerInvocation: string  // USDC wei as string
   description: string
   detailedDescription: string
-  category: 'defi' | 'monitoring' | 'data' | 'compute'
+  category: 'defi' | 'monitoring' | 'data' | 'compute' | 'ai'
   active: boolean
   registeredAt: string
   inputs: WorkflowIOField[]
@@ -30,6 +30,7 @@ export const CATEGORY_LABELS: Record<string, string> = {
   monitoring: 'Monitoring',
   data:       'Data',
   compute:    'Compute',
+  ai:         'AI Analysis',
 }
 
 export const CATEGORY_COLORS: Record<string, string> = {
@@ -37,6 +38,7 @@ export const CATEGORY_COLORS: Record<string, string> = {
   monitoring: 'bg-amber-500/15 text-amber-300 border-amber-500/25',
   data:       'bg-emerald-500/15 text-emerald-300 border-emerald-500/25',
   compute:    'bg-purple-500/15 text-purple-300 border-purple-500/25',
+  ai:         'bg-violet-500/15 text-violet-300 border-violet-500/25',
 }
 
 /** Format USDC wei (6 decimals) to readable string e.g. "$0.01" */

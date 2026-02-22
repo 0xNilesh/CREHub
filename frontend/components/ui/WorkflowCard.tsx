@@ -16,6 +16,7 @@ const CATEGORY_ICONS: Record<string, string> = {
   monitoring: '◉',
   data:       '◎',
   compute:    '◈',
+  ai:         '◆',
 }
 
 export default function WorkflowCard({ workflow, score, index = 0 }: Props) {
@@ -23,11 +24,12 @@ export default function WorkflowCard({ workflow, score, index = 0 }: Props) {
 
   return (
     <motion.div
+      className="h-full"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: index * 0.06, ease: [0.25, 0.46, 0.45, 0.94] }}
     >
-      <Link href={`/workflow/${workflowId}`} className="block group focus:outline-none focus-visible:ring-2 focus-visible:ring-cl-blue rounded-xl">
+      <Link href={`/workflow/${workflowId}`} className="block h-full group focus:outline-none focus-visible:ring-2 focus-visible:ring-cl-blue rounded-xl">
         <article className="card p-5 h-full flex flex-col gap-4 relative overflow-hidden">
           {/* Shine overlay */}
           <div className="absolute inset-0 bg-card-shine opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
@@ -41,10 +43,12 @@ export default function WorkflowCard({ workflow, score, index = 0 }: Props) {
             </span>
           </div>
 
-          {/* Description */}
-          <p className="text-sm text-white/80 leading-relaxed line-clamp-2 flex-1">
-            {description}
-          </p>
+          {/* Description — fixed 2-line height so all cards align */}
+          <div className="flex-1 overflow-hidden">
+            <p className="text-sm text-white/80 leading-relaxed line-clamp-3">
+              {description}
+            </p>
+          </div>
 
           {/* Price + I/O summary */}
           <div className="flex items-center gap-3">

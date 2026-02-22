@@ -2,8 +2,8 @@
   "workflowId": "wf_ta_signal_01",
   "creatorAddress": "0xFBDf4Dc13ed423C1E534Da0b2ed229B6a376a31f",
   "pricePerInvocation": "100000",
-  "description": "AI-powered technical analysis signal: BUY / SELL / HOLD for any crypto pair.",
-  "detailedDescription": "Fetches real-time RSI, MACD, and Bollinger Band data from TAAPI.io for the requested symbol and timeframe, then passes the indicators to OpenAI gpt-4o-mini which returns a structured BUY / SELL / HOLD decision with a confidence score and plain-English reasoning.",
+  "description": "Agentic market signal — real-time BUY / SELL / HOLD for any trading pair, driven by live technical indicators and autonomous AI reasoning.",
+  "detailedDescription": "An autonomous agentic system that ingests live market indicators — RSI, MACD, and Bollinger Bands — across any exchange and timeframe. A multi-step reasoning pipeline synthesises the signals and returns a structured trading decision (BUY / SELL / HOLD) with a confidence score and plain-English rationale, fully verified and settled on-chain.",
   "inputs": [
     {
       "name": "symbol",
