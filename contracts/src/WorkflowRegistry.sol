@@ -58,11 +58,17 @@ contract WorkflowRegistry {
     event WorkflowListed(
         string indexed workflowId,
         address indexed creatorAddress,
-        uint256 pricePerInvocation,
-        uint256 registeredAt
+        WorkflowMetadata metadata,
+        WorkflowIOField[] inputs,
+        WorkflowIOField[] outputs
     );
 
-    event WorkflowUpdated(string indexed workflowId, uint256 pricePerInvocation, bool active);
+    event WorkflowUpdated(
+        string workflowId,
+        address indexed creatorAddress,
+        uint256 pricePerInvocation,
+        bool active
+    );
 
     event ExecutionRecorded(
         bytes32 indexed executionId,
@@ -135,7 +141,7 @@ contract WorkflowRegistry {
         _workflowIds.push(workflowId);
         _exists[workflowId] = true;
 
-        emit WorkflowListed(workflowId, msg.sender, price, block.timestamp);
+        emit WorkflowListed(workflowId, msg.sender, _workflows[workflowId], _inputs[workflowId], _outputs[workflowId]);
     }
 
     /**
@@ -152,7 +158,7 @@ contract WorkflowRegistry {
         _workflows[workflowId].pricePerInvocation = newPrice;
         _workflows[workflowId].active = active;
 
-        emit WorkflowUpdated(workflowId, newPrice, active);
+        emit WorkflowUpdated(workflowId, msg.sender, newPrice, active);
     }
 
     // ─── SettlementVault: record execution ────────────────────────────────────

@@ -64,8 +64,23 @@ contract WorkflowRegistryTest is Test {
     }
 
     function test_ListWorkflow_EmitsEvent() public {
-        vm.expectEmit(false, true, true, false);
-        emit WorkflowRegistry.WorkflowListed("wf_test", creator, 10_000, 0);
+        // Build expected metadata — registeredAt will be block.timestamp so skip data check
+        WorkflowRegistry.WorkflowMetadata memory expectedMeta = WorkflowRegistry.WorkflowMetadata({
+            workflowId: "wf_test",
+            creatorAddress: creator,
+            pricePerInvocation: 10_000,
+            description: "desc",
+            detailedDescription: "detail",
+            category: "defi",
+            active: true,
+            registeredAt: block.timestamp
+        });
+
+        // topic1 = keccak256(workflowId) — skip (hash not predictable inline)
+        // topic2 = creatorAddress         — check
+        // checkData = false               — skip (registeredAt is block.timestamp, hard to match exactly)
+        vm.expectEmit(false, true, false, false);
+        emit WorkflowRegistry.WorkflowListed("wf_test", creator, expectedMeta, emptyFields, emptyFields);
 
         vm.prank(creator);
         registry.listWorkflow("wf_test", 10_000, "desc", "detail", "defi", emptyFields, emptyFields);
@@ -97,6 +112,19 @@ contract WorkflowRegistryTest is Test {
         (WorkflowRegistry.WorkflowMetadata memory meta,,) = registry.getWorkflow("wf_upd");
         assertEq(meta.pricePerInvocation, 20_000);
         assertFalse(meta.active);
+    }
+
+    function test_UpdateWorkflow_EmitsEvent() public {
+        vm.prank(creator);
+        registry.listWorkflow("wf_evt", 5000, "desc", "detail", "compute", emptyFields, emptyFields);
+
+        // topic1 = creatorAddress (only indexed param) — check
+        // checkData = true: workflowId (string), pricePerInvocation, active are all non-indexed
+        vm.expectEmit(true, false, false, true);
+        emit WorkflowRegistry.WorkflowUpdated("wf_evt", creator, 20_000, false);
+
+        vm.prank(creator);
+        registry.updateWorkflow("wf_evt", 20_000, false);
     }
 
     function test_UpdateWorkflow_Reverts_IfNotCreator() public {
