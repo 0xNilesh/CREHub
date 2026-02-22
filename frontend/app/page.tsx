@@ -38,6 +38,55 @@ function NetworkBg() {
           stroke="rgba(55,91,210,0.15)" strokeWidth="0.3" strokeLinecap="round"
         />
       ))}
+      {/* Particles travelling along each line */}
+      {lines.flatMap(([a, b], i) => {
+        const from = nodes[a]
+        const to = nodes[b]
+        const dur = 3 + (i % 4) * 0.7   // 3 s – 5.1 s per line
+        const baseDelay = i * 0.55
+        return [0, 1].map((j) => {
+          const begin = baseDelay + j * (dur / 2)
+          return (
+            <g key={`p-${i}-${j}`}>
+              <circle r="0.75" fill="#375BD2">
+                <animate
+                  attributeName="opacity"
+                  values="0;0.85;0.85;0"
+                  keyTimes="0;0.12;0.82;1"
+                  dur={`${dur}s`}
+                  begin={`${begin}s`}
+                  repeatCount="indefinite"
+                />
+                <animateMotion
+                  dur={`${dur}s`}
+                  begin={`${begin}s`}
+                  repeatCount="indefinite"
+                  calcMode="linear"
+                  path={`M${from.x},${from.y} L${to.x},${to.y}`}
+                />
+              </circle>
+              {/* subtle glow around the particle */}
+              <circle r="1.8" fill="url(#nodeGlow)">
+                <animate
+                  attributeName="opacity"
+                  values="0;0.4;0.4;0"
+                  keyTimes="0;0.12;0.82;1"
+                  dur={`${dur}s`}
+                  begin={`${begin}s`}
+                  repeatCount="indefinite"
+                />
+                <animateMotion
+                  dur={`${dur}s`}
+                  begin={`${begin}s`}
+                  repeatCount="indefinite"
+                  calcMode="linear"
+                  path={`M${from.x},${from.y} L${to.x},${to.y}`}
+                />
+              </circle>
+            </g>
+          )
+        })
+      })}
       {nodes.map((n, i) => (
         <g key={i}>
           <circle cx={n.x} cy={n.y} r={n.size * 2.5} fill="url(#nodeGlow)" opacity="0.4">
