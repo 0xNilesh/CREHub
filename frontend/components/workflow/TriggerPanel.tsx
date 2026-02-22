@@ -1,24 +1,59 @@
 'use client'
 
-import { useState } from 'react'
-import { useAccount } from 'wagmi'
+import { useState, useEffect } from 'react'
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { Workflow, WorkflowIOField } from '@/lib/types'
 import { formatPrice } from '@/lib/types'
 import { api } from '@/lib/api'
 
+const ERC20_TRANSFER_ABI = [
+  {
+    type: 'function',
+    name: 'transfer',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'to',    type: 'address' },
+      { name: 'value', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+] as const
+
 type Step = 'idle' | 'filling' | 'awaiting_payment' | 'verifying' | 'done' | 'error'
+
+interface PaymentDetails {
+  network: string
+  payTo: string
+  amount: string
+  token: string
+}
 
 interface Props { workflow: Workflow }
 
 export default function TriggerPanel({ workflow }: Props) {
   const { isConnected } = useAccount()
-  const [step,   setStep]   = useState<Step>('idle')
-  const [inputs, setInputs] = useState<Record<string, string>>({})
-  const [txHash, setTxHash] = useState('')
-  const [result, setResult] = useState<unknown>(null)
-  const [error,  setError]  = useState('')
+  const [step,           setStep]           = useState<Step>('idle')
+  const [inputs,         setInputs]         = useState<Record<string, string>>({})
+  const [txHash,         setTxHash]         = useState('')
+  const [result,         setResult]         = useState<unknown>(null)
+  const [error,          setError]          = useState('')
+  const [paymentDetails, setPaymentDetails] = useState<PaymentDetails | null>(null)
+  const [pendingPayTx,   setPendingPayTx]   = useState<`0x${string}` | undefined>(undefined)
+  const [payTxError,     setPayTxError]     = useState('')
+
+  const { writeContractAsync } = useWriteContract()
+  const { isSuccess: payTxConfirmed, isLoading: payTxPending } = useWaitForTransactionReceipt({
+    hash: pendingPayTx,
+  })
+
+  // Auto-fill tx hash once the payment is confirmed on-chain
+  useEffect(() => {
+    if (payTxConfirmed && pendingPayTx) {
+      setTxHash(pendingPayTx)
+    }
+  }, [payTxConfirmed, pendingPayTx])
 
   const required = workflow.inputs.filter((f) => f.required)
   const allFilled = required.every((f) => (inputs[f.name] ?? '').trim().length > 0)
@@ -28,6 +63,23 @@ export default function TriggerPanel({ workflow }: Props) {
 
   const reset = () => {
     setStep('idle'); setInputs({}); setTxHash(''); setResult(null); setError('')
+    setPaymentDetails(null); setPendingPayTx(undefined); setPayTxError('')
+  }
+
+  const handlePayWithWallet = async () => {
+    if (!paymentDetails) return
+    setPayTxError('')
+    try {
+      const hash = await writeContractAsync({
+        address: paymentDetails.token as `0x${string}`,
+        abi: ERC20_TRANSFER_ABI,
+        functionName: 'transfer',
+        args: [paymentDetails.payTo as `0x${string}`, BigInt(paymentDetails.amount)],
+      })
+      setPendingPayTx(hash)
+    } catch (e) {
+      setPayTxError(e instanceof Error ? e.message : 'Transaction rejected')
+    }
   }
 
   // Step 1: submit inputs → show 402 payment details
@@ -35,11 +87,13 @@ export default function TriggerPanel({ workflow }: Props) {
     setStep('awaiting_payment')
     setError('')
     const res = await api.trigger(workflow.workflowId, inputs)
-    if (res.status !== 402) {
+    if (res.status === 402) {
+      const body = res.body as { paymentDetails?: PaymentDetails }
+      if (body.paymentDetails) setPaymentDetails(body.paymentDetails)
+    } else {
       setError(`Unexpected response: ${res.status}`)
       setStep('error')
     }
-    // Payment details shown — user now pastes tx hash
   }
 
   // Step 2: confirm payment tx hash → verify + execute
@@ -123,15 +177,62 @@ export default function TriggerPanel({ workflow }: Props) {
           {/* ── STEP 1: Awaiting payment ────────────────────────────────── */}
           {step === 'awaiting_payment' && (
             <motion.div key="pay" {...fade} className="space-y-4">
-              <div className="rounded-lg border border-amber-500/25 bg-amber-500/8 p-3.5 text-xs space-y-1.5">
+              <div className="rounded-lg border border-amber-500/25 bg-amber-500/8 p-3.5 text-xs space-y-2.5">
                 <p className="font-semibold text-amber-300 flex items-center gap-1.5">
                   <span>⚡</span> Payment Required (HTTP 402)
                 </p>
-                <p className="text-white/55">Transfer <strong className="text-white">{formatPrice(workflow.pricePerInvocation)} USDC</strong> on Ethereum Sepolia to the platform wallet, then paste the tx hash below.</p>
+                <p className="text-white/55">
+                  Send <strong className="text-white">{formatPrice(workflow.pricePerInvocation)} USDC</strong> on Ethereum Sepolia to:
+                </p>
+                {/* Pay-to wallet address */}
+                <div className="flex items-center gap-2 rounded-md border border-amber-500/20 bg-black/20 px-3 py-2">
+                  <code className="flex-1 break-all font-mono text-[11px] text-amber-200/80">
+                    {paymentDetails?.payTo ?? '…'}
+                  </code>
+                  <button
+                    onClick={() => navigator.clipboard.writeText(paymentDetails?.payTo ?? '')}
+                    className="shrink-0 rounded border border-white/[0.08] px-2 py-0.5 text-[10px] text-white/30 transition hover:border-white/20 hover:text-white/60"
+                  >
+                    Copy
+                  </button>
+                </div>
                 <p className="font-mono text-[10px] text-white/30 break-all">
-                  Network: Ethereum Sepolia · Token: 0x1c7D…7238
+                  Network: Ethereum Sepolia · Token: {paymentDetails?.token ?? '0x1c7D…7238'}
+                </p>
+                <p className="text-white/40">
+                  Then paste the transaction hash below to confirm.
                 </p>
               </div>
+              {/* Pay with Wallet button */}
+              <button
+                onClick={handlePayWithWallet}
+                disabled={payTxPending || payTxConfirmed || !paymentDetails}
+                className="btn-primary w-full justify-center gap-2"
+              >
+                {payTxPending ? (
+                  <>
+                    <span className="size-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                    Confirming on-chain…
+                  </>
+                ) : payTxConfirmed ? (
+                  <>
+                    <span className="text-emerald-300">✓</span> Payment sent — hash auto-filled
+                  </>
+                ) : (
+                  <>Pay with Wallet</>
+                )}
+              </button>
+
+              {payTxError && (
+                <p className="text-[11px] text-red-400/80">{payTxError}</p>
+              )}
+
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-white/[0.07]" />
+                <span className="text-[10px] text-white/25 uppercase tracking-widest">or paste manually</span>
+                <div className="flex-1 h-px bg-white/[0.07]" />
+              </div>
+
               <div>
                 <label className="text-xs text-white/50 mb-1.5 block">USDC Transfer Tx Hash</label>
                 <input
@@ -146,7 +247,7 @@ export default function TriggerPanel({ workflow }: Props) {
                 disabled={!txHash.trim()}
                 className="btn-primary w-full justify-center"
               >
-                Confirm Payment
+                Confirm Payment →
               </button>
             </motion.div>
           )}
