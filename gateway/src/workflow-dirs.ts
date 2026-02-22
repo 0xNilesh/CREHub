@@ -11,7 +11,7 @@
 import path from 'node:path'
 
 // Two levels up from gateway/src → monorepo root
-const ROOT = new URL('../../..', import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1')
+const ROOT = new URL('../..', import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1')
 
 export const WORKFLOW_DIRS: Record<string, string> = {
 	wf_hello_world_01: path.join(ROOT, 'workflows', 'hello-world'),

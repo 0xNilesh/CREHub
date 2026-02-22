@@ -81,9 +81,17 @@ describe('parseSimulateOutput', () => {
 
 describe('runSimulate', () => {
 	test('returns parsed output on successful cre simulate', async () => {
-		// Mock execSync to return workflow output
+		// Mock spawnSync to return workflow output
 		const mockOutput = '{"healthFactor":2.4,"riskLevel":"safe"}'
-		const spy = spyOn(childProcess, 'execSync').mockReturnValue(mockOutput as any)
+		const spy = spyOn(childProcess, 'spawnSync').mockReturnValue({
+			stdout: mockOutput,
+			stderr: '',
+			status: 0,
+			pid: 0,
+			output: [],
+			signal: null,
+			error: undefined,
+		} as any)
 
 		const { runSimulate } = await import('../src/simulate')
 		const result = await runSimulate('/tmp/fake-workflow', { walletAddress: '0x1234' })
@@ -94,13 +102,16 @@ describe('runSimulate', () => {
 		spy.mockRestore()
 	})
 
-	test('returns success=false when execSync throws (non-zero exit)', async () => {
-		const spy = spyOn(childProcess, 'execSync').mockImplementation(() => {
-			const err = new Error('cre simulate failed') as any
-			err.stdout = ''
-			err.stderr = 'Error: workflow handler threw an exception'
-			throw err
-		})
+	test('returns success=false when spawnSync returns non-zero exit', async () => {
+		const spy = spyOn(childProcess, 'spawnSync').mockReturnValue({
+			stdout: '',
+			stderr: 'Error: workflow handler threw an exception',
+			status: 1,
+			pid: 0,
+			output: [],
+			signal: null,
+			error: undefined,
+		} as any)
 
 		const { runSimulate } = await import('../src/simulate')
 		const result = await runSimulate('/tmp/fake-workflow', { walletAddress: '0x1234' })
@@ -112,9 +123,15 @@ describe('runSimulate', () => {
 	})
 
 	test('returns success=false when output has no JSON', async () => {
-		const spy = spyOn(childProcess, 'execSync').mockReturnValue(
-			'Starting...\nCompiling...\nDone.' as any,
-		)
+		const spy = spyOn(childProcess, 'spawnSync').mockReturnValue({
+			stdout: 'Starting...\nCompiling...\nDone.',
+			stderr: '',
+			status: 0,
+			pid: 0,
+			output: [],
+			signal: null,
+			error: undefined,
+		} as any)
 
 		const { runSimulate } = await import('../src/simulate')
 		const result = await runSimulate('/tmp/fake-workflow', {})

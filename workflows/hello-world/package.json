@@ -5,7 +5,7 @@
   "type": "module",
   "description": "CREHub hello-world CRE workflow — greets by name.",
   "scripts": {
-    "cre-compile": "bun build src/index.ts --outfile dist/index.js --target bun",
+    "cre-compile": "bun scripts/cre-compile.ts",
     "simulate": "cre workflow simulate . --target local-simulation",
     "simulate:staging": "cre workflow simulate . --target staging-settings",
     "typecheck": "tsc --noEmit",

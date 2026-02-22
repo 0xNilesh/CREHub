@@ -7,31 +7,58 @@
  * Output parsing: The CRE CLI prints workflow logs to stdout. We capture all
  * output and attempt to parse the last JSON object as the workflow result.
  * On non-zero exit code the error is captured from stderr.
+ *
+ * Shell strategy: On Windows we invoke powershell.exe explicitly (not cmd.exe).
+ * cmd.exe causes `cre workflow simulate` to hang indefinitely even with
+ * --non-interactive, while the identical command completes in ~4s under
+ * PowerShell. spawnSync with explicit args avoids any shell-escaping issues.
  */
-import { execSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { randomUUID } from 'node:crypto'
-import { tmpdir, homedir } from 'node:os'
+import { homedir } from 'node:os'
 import type { SimulateResult } from './types'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const SIMULATE_TIMEOUT_MS = 60_000 // 60 s
+const SIMULATE_TIMEOUT_MS = 120_000 // 120 s
 const HTTP_PAYLOAD_FILENAME = 'http_trigger_payload.json'
 
 // ─── Output parser ────────────────────────────────────────────────────────────
 
-export const parseSimulateOutput = (stdout: string): SimulateResult => {
-	const lines = stdout.split('\n').filter(Boolean)
+const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '')
 
-	// Walk lines in reverse looking for the last parseable JSON object/array.
-	for (let i = lines.length - 1; i >= 0; i--) {
-		const line = lines[i].trim()
+export const parseSimulateOutput = (stdout: string): SimulateResult => {
+	const rawLines = stdout.split('\n')
+	const logLines = rawLines.map(stripAnsi).filter(Boolean)
+
+	// Strategy 1: look for "Workflow Simulation Result:" marker (CRE CLI pretty-prints
+	// a multi-line JSON block after this line, terminated by a blank line).
+	const markerIdx = rawLines.findIndex(l => l.includes('Workflow Simulation Result:'))
+	if (markerIdx !== -1) {
+		const jsonLines: string[] = []
+		for (let i = markerIdx + 1; i < rawLines.length; i++) {
+			const trimmed = stripAnsi(rawLines[i]).trim()
+			if (!trimmed) break // blank line signals end of JSON block
+			jsonLines.push(trimmed)
+		}
+		if (jsonLines.length > 0) {
+			try {
+				const parsed = JSON.parse(jsonLines.join('\n'))
+				return { success: true, output: parsed, logs: logLines }
+			} catch {
+				// malformed — fall through to Strategy 2
+			}
+		}
+	}
+
+	// Strategy 2: walk lines in reverse looking for the last parseable single-line JSON.
+	for (let i = logLines.length - 1; i >= 0; i--) {
+		const line = logLines[i].trim()
 		if (line.startsWith('{') || line.startsWith('[')) {
 			try {
 				const parsed = JSON.parse(line)
-				return { success: true, output: parsed, logs: lines }
+				return { success: true, output: parsed, logs: logLines }
 			} catch {
 				// not JSON — keep searching
 			}
@@ -43,7 +70,7 @@ export const parseSimulateOutput = (stdout: string): SimulateResult => {
 		success: false,
 		output: null,
 		error: 'No JSON output found in simulate stdout',
-		logs: lines,
+		logs: logLines,
 	}
 }
 
@@ -57,47 +84,56 @@ export const runSimulate = async (workflowDir: string, input: unknown): Promise<
 	const payloadPath = join(workflowDir, HTTP_PAYLOAD_FILENAME)
 	writeFileSync(payloadPath, JSON.stringify(input), 'utf8')
 
-	let stdout = ''
-	let stderr = ''
-
 	const target = process.env.CRE_TARGET ?? 'local-simulation'
-	const cmd = [
-		'cre workflow simulate',
-		workflowDir,
-		`--target ${target} --broadcast`,
-		`--http-payload ./${HTTP_PAYLOAD_FILENAME}`,
-	].join(' ')
-
-	// Ensure ~/.cre/bin (CRE CLI install location) is on PATH
-	const creBin = join(homedir(), '.cre', 'bin')
+	// Ensure CRE CLI install dir is on PATH (Windows: AppData\Local\Programs\cre)
+	const isWin = process.platform === 'win32'
+	const creBin = isWin
+		? join(homedir(), 'AppData', 'Local', 'Programs', 'cre')
+		: join(homedir(), '.cre', 'bin')
+	const pathSep = isWin ? ';' : ':'
 	const env = {
 		...process.env,
-		PATH: `${creBin}:${process.env.PATH ?? ''}`,
+		PATH: `${creBin}${pathSep}${process.env.PATH ?? ''}`,
 	}
 
-	try {
-		const combined = execSync(cmd, {
-			cwd: workflowDir,
-			timeout: SIMULATE_TIMEOUT_MS,
-			encoding: 'utf8',
-			stdio: ['pipe', 'pipe', 'pipe'],
-			shell: '/bin/zsh',
-			env,
-		})
-		stdout = combined
-	} catch (err: unknown) {
-		if (err && typeof err === 'object' && 'stdout' in err && 'stderr' in err) {
-			const spawnErr = err as { stdout: string; stderr: string; message: string }
-			stdout = spawnErr.stdout ?? ''
-			stderr = spawnErr.stderr ?? ''
-			return {
-				success: false,
-				output: null,
-				error: stderr || spawnErr.message,
-				logs: [...stdout.split('\n'), ...stderr.split('\n')].filter(Boolean),
-			}
+	// Build the cre CLI args (same on all platforms)
+	const creArgs = [
+		'workflow', 'simulate', '.',
+		'-R', '.',
+		'--target', target,
+		'--non-interactive',
+		'--trigger-index', '0',
+		'--http-payload', `./${HTTP_PAYLOAD_FILENAME}`,
+	]
+
+	// On Windows: invoke via powershell.exe to avoid cmd.exe hanging behaviour.
+	// On Unix: invoke cre directly via spawnSync (no shell needed).
+	const proc = isWin
+		? spawnSync('powershell.exe', ['-NonInteractive', '-NoProfile', '-Command', `cre ${creArgs.join(' ')}`], {
+				cwd: workflowDir,
+				timeout: SIMULATE_TIMEOUT_MS,
+				encoding: 'utf8' as const,
+				stdio: ['pipe', 'pipe', 'pipe'],
+				env,
+			})
+		: spawnSync('cre', creArgs, {
+				cwd: workflowDir,
+				timeout: SIMULATE_TIMEOUT_MS,
+				encoding: 'utf8' as const,
+				stdio: ['pipe', 'pipe', 'pipe'],
+				env,
+			})
+
+	const stdout = proc.stdout ?? ''
+	const stderr = proc.stderr ?? ''
+
+	if (proc.error || proc.status !== 0) {
+		return {
+			success: false,
+			output: null,
+			error: stderr || proc.error?.message || `simulate exited with code ${proc.status}`,
+			logs: [...stdout.split('\n'), ...stderr.split('\n')].filter(Boolean),
 		}
-		throw err
 	}
 
 	return parseSimulateOutput(stdout)
