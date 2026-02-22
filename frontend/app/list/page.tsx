@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { api } from '@/lib/api'
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { REGISTRY_ADDRESS, REGISTRY_ABI } from '@/lib/contracts'
 import type { WorkflowIOField } from '@/lib/types'
 import { CATEGORY_LABELS } from '@/lib/types'
 
@@ -16,7 +17,6 @@ interface FormState {
   detailedDescription: string
   category: string
   pricePerInvocation: string
-  creatorAddress: string
   inputs: FieldDraft[]
   outputs: FieldDraft[]
 }
@@ -28,7 +28,6 @@ const EMPTY_FIELD = (): FieldDraft => ({
 const INITIAL: FormState = {
   workflowId: '', description: '', detailedDescription: '',
   category: 'defi', pricePerInvocation: '10000',
-  creatorAddress: '',
   inputs: [EMPTY_FIELD()], outputs: [EMPTY_FIELD()],
 }
 
@@ -37,11 +36,16 @@ const STEPS = ['Basics', 'Inputs', 'Outputs', 'Preview']
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ListPage() {
+  const { address, isConnected } = useAccount()
+  const { writeContractAsync } = useWriteContract()
+
   const [step,    setStep]    = useState(0)
   const [form,    setForm]    = useState<FormState>(INITIAL)
   const [loading, setLoading] = useState(false)
-  const [result,  setResult]  = useState<{ success: boolean; message: string } | null>(null)
+  const [txHash,  setTxHash]  = useState<`0x${string}` | undefined>()
   const [error,   setError]   = useState('')
+
+  const { isLoading: isMining, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash: txHash })
 
   const set = <K extends keyof FormState>(key: K, val: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: val }))
@@ -57,15 +61,15 @@ export default function ListPage() {
     set(dir, arr)
   }
 
-  const addField   = (dir: 'inputs' | 'outputs') => set(dir, [...form[dir], EMPTY_FIELD()])
+  const addField    = (dir: 'inputs' | 'outputs') => set(dir, [...form[dir], EMPTY_FIELD()])
   const removeField = (dir: 'inputs' | 'outputs', i: number) =>
     set(dir, form[dir].filter((_, idx) => idx !== i))
 
   const canProceed = [
-    // Step 0 basics
+    // Step 0 basics — wallet must be connected
+    isConnected &&
     form.workflowId.trim() && /^[a-z0-9_]+$/.test(form.workflowId) &&
-    form.description.trim().length > 0 && form.description.length <= 160 &&
-    form.creatorAddress.match(/^0x[0-9a-fA-F]{40}$/),
+    form.description.trim().length > 0 && form.description.length <= 160,
     // Step 1 inputs
     form.inputs.every((f) => f.name.trim().length > 0),
     // Step 2 outputs
@@ -75,33 +79,80 @@ export default function ListPage() {
   ]
 
   const handleSubmit = async () => {
+    if (!isConnected || !address) {
+      setError('Connect your wallet first')
+      return
+    }
     setLoading(true); setError('')
     try {
-      const res = await api.listWorkflow(form)
-      setResult({ success: true, message: res.message })
+      const hash = await writeContractAsync({
+        address: REGISTRY_ADDRESS,
+        abi: REGISTRY_ABI,
+        functionName: 'listWorkflow',
+        args: [
+          form.workflowId,
+          BigInt(form.pricePerInvocation || '0'),
+          form.description,
+          form.detailedDescription,
+          form.category,
+          form.inputs.map(({ name, fieldType, description, required }) => ({
+            name, fieldType, description, required,
+          })),
+          form.outputs.map(({ name, fieldType, description, required }) => ({
+            name, fieldType, description, required,
+          })),
+        ],
+      })
+      setTxHash(hash)
       setStep(4)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Submission failed')
+      setError(e instanceof Error ? e.message : 'Transaction failed')
     } finally {
       setLoading(false)
     }
   }
 
   // ── Submitted ──────────────────────────────────────────────────────────────
-  if (step === 4 && result?.success) {
+  if (step === 4 && txHash) {
     return (
       <div className="min-h-screen pt-32 flex items-start justify-center px-4">
         <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="card p-10 max-w-md w-full text-center">
-          <div className="size-14 rounded-full bg-emerald-400/15 border border-emerald-400/25 flex items-center justify-center text-2xl mx-auto mb-5">✓</div>
-          <h2 className="text-xl font-bold text-white mb-2">Workflow Listed!</h2>
-          <p className="text-sm text-white/50 mb-6">{result.message}</p>
-          <div className="rounded-lg bg-white/[0.04] border border-white/[0.07] px-4 py-3 text-left mb-6">
+          {isConfirmed ? (
+            <>
+              <div className="size-14 rounded-full bg-emerald-400/15 border border-emerald-400/25 flex items-center justify-center text-2xl mx-auto mb-5">✓</div>
+              <h2 className="text-xl font-bold text-white mb-2">Workflow Listed!</h2>
+              <p className="text-sm text-white/50 mb-6">Transaction confirmed on Sepolia.</p>
+            </>
+          ) : (
+            <>
+              <div className="size-14 rounded-full bg-cl-blue/15 border border-cl-blue/25 flex items-center justify-center mx-auto mb-5">
+                <svg className="animate-spin size-6 text-cl-blue-l" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83" strokeLinecap="round" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-white mb-2">Transaction Submitted</h2>
+              <p className="text-sm text-white/50 mb-6">Waiting for on-chain confirmation…</p>
+            </>
+          )}
+
+          <div className="rounded-lg bg-white/[0.04] border border-white/[0.07] px-4 py-3 text-left mb-3">
             <p className="text-[10px] text-white/30 uppercase tracking-widest mb-1">Workflow ID</p>
             <code className="text-sm font-mono text-cl-blue-l">{form.workflowId}</code>
           </div>
+          <div className="rounded-lg bg-white/[0.04] border border-white/[0.07] px-4 py-3 text-left mb-6">
+            <p className="text-[10px] text-white/30 uppercase tracking-widest mb-1">Transaction</p>
+            <a
+              href={`https://sepolia.etherscan.io/tx/${txHash}`}
+              target="_blank" rel="noopener noreferrer"
+              className="text-xs font-mono text-cl-blue-l hover:underline break-all"
+            >
+              {txHash}
+            </a>
+          </div>
+
           <div className="flex gap-3">
             <a href={`/workflow/${form.workflowId}`} className="btn-primary flex-1 justify-center text-sm">View Workflow</a>
-            <button onClick={() => { setForm(INITIAL); setStep(0); setResult(null) }} className="btn-ghost flex-1 justify-center text-sm">List Another</button>
+            <button onClick={() => { setForm(INITIAL); setStep(0); setTxHash(undefined) }} className="btn-ghost flex-1 justify-center text-sm">List Another</button>
           </div>
         </motion.div>
       </div>
@@ -119,16 +170,23 @@ export default function ListPage() {
           <p className="mt-2 text-sm text-white/45">Make your CRE workflow discoverable and monetise it with USDC micropayments.</p>
         </div>
 
+        {/* Wallet warning */}
+        {!isConnected && (
+          <div className="mb-6 rounded-lg border border-amber-500/25 bg-amber-500/8 px-4 py-3 text-xs text-amber-300">
+            Connect your wallet to submit a listing on-chain.
+          </div>
+        )}
+
         {/* Step bar */}
         <div className="flex items-center gap-0 mb-10">
           {STEPS.map((label, i) => (
             <div key={label} className="flex items-center flex-1">
               <div
-                className={`flex flex-col items-center gap-1 flex-1 cursor-pointer`}
+                className="flex flex-col items-center gap-1 flex-1 cursor-pointer"
                 onClick={() => i < step && setStep(i)}
               >
                 <div className={`size-7 rounded-full text-xs flex items-center justify-center font-semibold transition-all duration-300 ${
-                  i < step    ? 'bg-emerald-500 text-white'
+                  i < step     ? 'bg-emerald-500 text-white'
                   : i === step ? 'bg-cl-blue text-white shadow-glow-sm'
                   : 'bg-white/[0.08] text-white/25'
                 }`}>
@@ -152,10 +210,10 @@ export default function ListPage() {
             exit={{ opacity: 0, x: -16 }}
             transition={{ duration: 0.25 }}
           >
-            {step === 0 && <StepBasics form={form} set={set} />}
-            {step === 1 && <StepFields dir="inputs" fields={form.inputs} onAdd={() => addField('inputs')} onRemove={(i) => removeField('inputs', i)} onSet={(i, k, v) => setFieldProp('inputs', i, k, v)} />}
+            {step === 0 && <StepBasics form={form} set={set} connectedAddress={address} />}
+            {step === 1 && <StepFields dir="inputs"  fields={form.inputs}  onAdd={() => addField('inputs')}  onRemove={(i) => removeField('inputs', i)}  onSet={(i, k, v) => setFieldProp('inputs', i, k, v)} />}
             {step === 2 && <StepFields dir="outputs" fields={form.outputs} onAdd={() => addField('outputs')} onRemove={(i) => removeField('outputs', i)} onSet={(i, k, v) => setFieldProp('outputs', i, k, v)} />}
-            {step === 3 && <StepPreview form={form} />}
+            {step === 3 && <StepPreview form={form} connectedAddress={address} />}
           </motion.div>
         </AnimatePresence>
 
@@ -185,12 +243,12 @@ export default function ListPage() {
           ) : (
             <button
               onClick={handleSubmit}
-              disabled={loading}
-              className="btn-primary min-w-[140px] justify-center"
+              disabled={loading || !isConnected}
+              className="btn-primary min-w-[140px] justify-center disabled:opacity-40"
             >
               {loading
-                ? <span className="flex items-center gap-2"><svg className="animate-spin size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83" strokeLinecap="round"/></svg>Submitting…</span>
-                : 'Submit Listing'
+                ? <span className="flex items-center gap-2"><svg className="animate-spin size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83" strokeLinecap="round"/></svg>Confirm in wallet…</span>
+                : 'Submit On-Chain'
               }
             </button>
           )}
@@ -202,7 +260,13 @@ export default function ListPage() {
 
 // ─── Step components ──────────────────────────────────────────────────────────
 
-function StepBasics({ form, set }: { form: FormState; set: <K extends keyof FormState>(k: K, v: FormState[K]) => void }) {
+function StepBasics({
+  form, set, connectedAddress,
+}: {
+  form: FormState
+  set: <K extends keyof FormState>(k: K, v: FormState[K]) => void
+  connectedAddress?: string
+}) {
   return (
     <div className="card p-6 space-y-5">
       <h2 className="text-base font-semibold text-white">Basic Information</h2>
@@ -235,9 +299,10 @@ function StepBasics({ form, set }: { form: FormState; set: <K extends keyof Form
           <input className="input font-mono" type="number" min="0" value={form.pricePerInvocation}
             onChange={(e) => set('pricePerInvocation', e.target.value)} />
         </Field>
-        <Field label="Creator address" required>
-          <input className="input font-mono text-xs" value={form.creatorAddress} placeholder="0x…"
-            onChange={(e) => set('creatorAddress', e.target.value)} />
+        <Field label="Creator (connected wallet)">
+          <div className="input font-mono text-xs text-white/40 truncate select-none">
+            {connectedAddress ?? 'Not connected'}
+          </div>
         </Field>
       </div>
     </div>
@@ -303,7 +368,7 @@ function StepFields({ dir, fields, onAdd, onRemove, onSet }: {
   )
 }
 
-function StepPreview({ form }: { form: FormState }) {
+function StepPreview({ form, connectedAddress }: { form: FormState; connectedAddress?: string }) {
   return (
     <div className="space-y-4">
       <div className="card p-6">
@@ -314,14 +379,14 @@ function StepPreview({ form }: { form: FormState }) {
             description: form.description,
             category: form.category,
             pricePerInvocation: form.pricePerInvocation,
-            creatorAddress: form.creatorAddress,
+            creatorAddress: connectedAddress ?? '(connect wallet)',
             inputs: form.inputs,
             outputs: form.outputs,
           }, null, 2)}
         </pre>
       </div>
       <div className="rounded-lg border border-cl-blue/20 bg-cl-blue/8 px-4 py-3 text-xs text-white/50">
-        <span className="font-semibold text-cl-blue-l">Demo mode:</span> Listing stored in-memory. Deploy to Ethereum Sepolia via <code className="font-mono">WorkflowRegistry.listWorkflow()</code> for on-chain persistence.
+        <span className="font-semibold text-cl-blue-l">On-chain:</span> Submitting will call <code className="font-mono">WorkflowRegistry.listWorkflow()</code> on Ethereum Sepolia via your connected wallet.
       </div>
     </div>
   )
