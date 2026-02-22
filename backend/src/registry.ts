@@ -16,6 +16,8 @@ export const REGISTRY_ABI = parseAbi([
 	'function getWorkflow(string workflowId) view returns ((string workflowId, address creatorAddress, uint256 pricePerInvocation, string description, string detailedDescription, string category, bool active, uint256 registeredAt) metadata, (string name, string fieldType, string description, bool required)[] inputs, (string name, string fieldType, string description, bool required)[] outputs)',
 	'function getActiveWorkflows(uint256 offset, uint256 limit) view returns ((string workflowId, address creatorAddress, uint256 pricePerInvocation, string description, string detailedDescription, string category, bool active, uint256 registeredAt)[])',
 	'function totalWorkflows() view returns (uint256)',
+	'event WorkflowListed(string indexed workflowId, address indexed creatorAddress, (string workflowId, address creatorAddress, uint256 pricePerInvocation, string description, string detailedDescription, string category, bool active, uint256 registeredAt) metadata, (string name, string fieldType, string description, bool required)[] inputs, (string name, string fieldType, string description, bool required)[] outputs)',
+	'event WorkflowUpdated(string workflowId, address indexed creatorAddress, uint256 pricePerInvocation, bool active)',
 ])
 
 // ─── Client (injectable for testing) ─────────────────────────────────────────

@@ -1,11 +1,11 @@
 /**
- * Phase 4 – cache.ts tests
+ * cache.ts tests
  *
- * Tests WorkflowCache with a mock RegistryReader and mock SearchIndex.
+ * Tests WorkflowCache with a mock SearchIndex.
+ * Uses in-memory mode (no DB) via seed().
  */
 import { describe, expect, test, beforeEach } from 'bun:test'
 import { WorkflowCache } from '../src/cache'
-import { RegistryReader } from '../src/registry'
 import { SearchIndex, setEmbedder } from '../src/search'
 import type { WorkflowListing } from '../src/types'
 import type { Hex } from 'viem'
@@ -35,64 +35,55 @@ const makeListing = (id: string, active = true): WorkflowListing => ({
 
 describe('WorkflowCache', () => {
 	test('seed() populates cache with provided listings', async () => {
-		const reader = new RegistryReader() // no address → not configured
 		const index = new SearchIndex()
-		const cache = new WorkflowCache(reader, index)
+		const cache = new WorkflowCache(undefined, index)
 
 		await cache.seed([makeListing('wf_a'), makeListing('wf_b')])
 
-		expect(cache.getAll().length).toBe(2)
-		expect(cache.getOne('wf_a')).toBeDefined()
-		expect(cache.getOne('wf_b')).toBeDefined()
+		expect((await cache.getAll()).length).toBe(2)
+		expect(await cache.getOne('wf_a')).toBeDefined()
+		expect(await cache.getOne('wf_b')).toBeDefined()
 	})
 
 	test('getAll() returns only active listings', async () => {
-		const reader = new RegistryReader()
 		const index = new SearchIndex()
-		const cache = new WorkflowCache(reader, index)
+		const cache = new WorkflowCache(undefined, index)
 
-		await cache.seed([
-			makeListing('wf_active', true),
-			makeListing('wf_inactive', false),
-		])
+		await cache.seed([makeListing('wf_active', true), makeListing('wf_inactive', false)])
 
-		const all = cache.getAll()
+		const all = await cache.getAll()
 		expect(all.find((l) => l.metadata.workflowId === 'wf_active')).toBeDefined()
 		expect(all.find((l) => l.metadata.workflowId === 'wf_inactive')).toBeUndefined()
 	})
 
-	test('getOne() returns undefined for unknown workflowId', async () => {
-		const reader = new RegistryReader()
+	test('getOne() returns null for unknown workflowId', async () => {
 		const index = new SearchIndex()
-		const cache = new WorkflowCache(reader, index)
+		const cache = new WorkflowCache(undefined, index)
 
 		await cache.seed([])
-		expect(cache.getOne('nonexistent')).toBeUndefined()
+		expect(await cache.getOne('nonexistent')).toBeNull()
 	})
 
 	test('seed() rebuilds search index', async () => {
-		const reader = new RegistryReader()
 		const index = new SearchIndex()
-		const cache = new WorkflowCache(reader, index)
+		const cache = new WorkflowCache(undefined, index)
 
 		await cache.seed([makeListing('wf_1'), makeListing('wf_2')])
 		expect(index.size).toBe(2)
 	})
 
 	test('ready is true after seed()', async () => {
-		const reader = new RegistryReader()
 		const index = new SearchIndex()
-		const cache = new WorkflowCache(reader, index)
+		const cache = new WorkflowCache(undefined, index)
 
 		expect(cache.ready).toBe(false)
 		await cache.seed([])
 		expect(cache.ready).toBe(true)
 	})
 
-	test('getIndex() returns the search index', async () => {
-		const reader = new RegistryReader()
+	test('getIndex() returns the search index', () => {
 		const index = new SearchIndex()
-		const cache = new WorkflowCache(reader, index)
+		const cache = new WorkflowCache(undefined, index)
 		expect(cache.getIndex()).toBe(index)
 	})
 })
