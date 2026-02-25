@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>MetaMask MCP Bridge</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+    }
+
+    .logo { font-size: 48px; margin-bottom: 12px; }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: #94a3b8;
+      margin-bottom: 32px;
+    }
+
+    .card {
+      background: #1e2332;
+      border: 1px solid #2d3450;
+      border-radius: 12px;
+      padding: 20px 24px;
+      width: 100%;
+      max-width: 540px;
+      margin-bottom: 16px;
+    }
+
+    .card-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #64748b;
+      margin-bottom: 14px;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .status-row:last-child { margin-bottom: 0; }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: #ef4444;
+      transition: background 0.3s;
+    }
+
+    .dot.ok { background: #22c55e; }
+    .dot.warn { background: #f59e0b; }
+
+    .status-label { font-size: 14px; flex: 1; }
+    .status-value { font-size: 13px; color: #94a3b8; font-family: monospace; }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: none;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      margin-top: 12px;
+      background: #f97316;
+      color: #fff;
+    }
+
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .log {
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 260px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .log-entry {
+      padding: 8px 10px;
+      border-radius: 6px;
+      background: #141824;
+      border-left: 3px solid #2d3450;
+      line-height: 1.5;
+      word-break: break-all;
+    }
+
+    .log-entry.ok  { border-left-color: #22c55e; }
+    .log-entry.err { border-left-color: #ef4444; }
+    .log-entry.in  { border-left-color: #3b82f6; }
+
+    .log-time { color: #475569; margin-right: 6px; }
+    .log-method { color: #93c5fd; }
+
+    .empty-log { color: #475569; font-size: 13px; font-style: italic; }
+
+    .address { font-family: monospace; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+  <div class="logo">🦊</div>
+  <h1>MetaMask MCP Bridge</h1>
+  <p class="subtitle">Keep this tab open — Claude uses it to reach your wallet</p>
+
+  <!-- Status card -->
+  <div class="card">
+    <div class="card-title">Status</div>
+
+    <div class="status-row">
+      <div class="dot" id="dot-ws"></div>
+      <span class="status-label">MCP Server</span>
+      <span class="status-value" id="val-ws">connecting…</span>
+    </div>
+
+    <div class="status-row">
+      <div class="dot" id="dot-mm"></div>
+      <span class="status-label">MetaMask</span>
+      <span class="status-value" id="val-mm">checking…</span>
+    </div>
+
+    <div class="status-row">
+      <div class="dot" id="dot-acc"></div>
+      <span class="status-label">Account</span>
+      <span class="status-value address" id="val-acc">not connected</span>
+    </div>
+
+    <button id="btn-connect" disabled>Connect MetaMask</button>
+  </div>
+
+  <!-- Activity log -->
+  <div class="card">
+    <div class="card-title">Activity Log</div>
+    <div class="log" id="log">
+      <div class="empty-log">No activity yet. Claude will trigger actions here.</div>
+    </div>
+  </div>
+
+  <script>
+    // ── DOM refs ──────────────────────────────────────────────────────────
+    const dotWs  = document.getElementById("dot-ws");
+    const dotMm  = document.getElementById("dot-mm");
+    const dotAcc = document.getElementById("dot-acc");
+    const valWs  = document.getElementById("val-ws");
+    const valMm  = document.getElementById("val-mm");
+    const valAcc = document.getElementById("val-acc");
+    const btnConnect = document.getElementById("btn-connect");
+    const logEl = document.getElementById("log");
+
+    // ── Logging ───────────────────────────────────────────────────────────
+    function addLog(text, type = "in") {
+      // Remove empty placeholder
+      const placeholder = logEl.querySelector(".empty-log");
+      if (placeholder) placeholder.remove();
+
+      const time = new Date().toLocaleTimeString();
+      const el = document.createElement("div");
+      el.className = `log-entry ${type}`;
+      el.innerHTML = `<span class="log-time">${time}</span>${text}`;
+      logEl.prepend(el);
+
+      // Keep max 50 entries
+      while (logEl.children.length > 50) logEl.removeChild(logEl.lastChild);
+    }
+
+    // ── MetaMask detection ────────────────────────────────────────────────
+    function setMmStatus(ok, label) {
+      dotMm.className = "dot" + (ok ? " ok" : "");
+      valMm.textContent = label;
+    }
+
+    if (!window.ethereum) {
+      setMmStatus(false, "not detected — install MetaMask");
+      addLog("MetaMask not found. Install the MetaMask extension and reload.", "err");
+    } else {
+      setMmStatus(true, "detected");
+    }
+
+    // ── Account refresh ───────────────────────────────────────────────────
+    async function refreshAccounts() {
+      if (!window.ethereum) return;
+      try {
+        const accounts = await window.ethereum.request({ method: "eth_accounts" });
+        if (accounts.length) {
+          dotAcc.className = "dot ok";
+          valAcc.textContent = accounts[0].slice(0, 8) + "…" + accounts[0].slice(-6);
+          btnConnect.textContent = "Switch / Reconnect";
+        } else {
+          dotAcc.className = "dot warn";
+          valAcc.textContent = "not connected";
+          btnConnect.textContent = "Connect MetaMask";
+        }
+      } catch (_) {}
+    }
+
+    refreshAccounts();
+
+    window.ethereum?.on("accountsChanged", refreshAccounts);
+    window.ethereum?.on("chainChanged", () => location.reload());
+
+    btnConnect.addEventListener("click", async () => {
+      try {
+        await window.ethereum.request({ method: "eth_requestAccounts" });
+        await refreshAccounts();
+        addLog("Wallet connected by user", "ok");
+      } catch (e) {
+        addLog("Connection rejected: " + e.message, "err");
+      }
+    });
+
+    // ── WebSocket bridge ──────────────────────────────────────────────────
+    let ws = null;
+    let reconnectDelay = 1000;
+
+    function connect() {
+      const proto = location.protocol === "https:" ? "wss:" : "ws:";
+      ws = new WebSocket(`${proto}//${location.host}/bridge-ws`);
+
+      ws.onopen = () => {
+        dotWs.className = "dot ok";
+        valWs.textContent = "connected";
+        btnConnect.disabled = !window.ethereum;
+        reconnectDelay = 1000;
+        addLog("Connected to MCP server — ready for Claude", "ok");
+      };
+
+      ws.onclose = () => {
+        dotWs.className = "dot";
+        valWs.textContent = `reconnecting in ${reconnectDelay / 1000}s…`;
+        btnConnect.disabled = true;
+        addLog("MCP server connection lost — reconnecting…", "err");
+        setTimeout(connect, reconnectDelay);
+        reconnectDelay = Math.min(reconnectDelay * 2, 15_000);
+      };
+
+      ws.onerror = () => {
+        // onclose will fire next
+      };
+
+      ws.onmessage = async (event) => {
+        let msg;
+        try { msg = JSON.parse(event.data); }
+        catch { return; }
+
+        const { id, method, params } = msg;
+        addLog(`<span class="log-method">${method}</span> ${JSON.stringify(params ?? []).slice(0, 120)}`);
+
+        if (!window.ethereum) {
+          ws.send(JSON.stringify({ id, error: "MetaMask not available" }));
+          addLog(`Error: MetaMask not available`, "err");
+          return;
+        }
+
+        try {
+          const result = await window.ethereum.request({ method, params: params ?? [] });
+          ws.send(JSON.stringify({ id, result }));
+          const preview = JSON.stringify(result).slice(0, 120);
+          addLog(`✓ ${method} → ${preview}`, "ok");
+        } catch (err) {
+          ws.send(JSON.stringify({ id, error: err.message ?? String(err) }));
+          addLog(`✗ ${method} failed: ${err.message}`, "err");
+        }
+      };
+    }
+
+    connect();
+  </script>
+</body>
+</html>
