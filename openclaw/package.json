@@ -1,0 +1,13 @@
+{
+  "name": "crehub-openclaw",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "agent": "bun run agent.ts",
+    "agent:interactive": "bun run agent.ts"
+  },
+  "dependencies": {
+    "openai": "^4.90.0",
+    "viem": "^2.21.54"
+  }
+}

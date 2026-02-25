@@ -5,7 +5,8 @@
   "workspaces": [
     "gateway",
     "backend",
-    "frontend"
+    "frontend",
+    "openclaw"
   ],
   "scripts": {
     "build:sdk": "cd cre-sdk-typescript/packages/cre-sdk && bun run build",
@@ -16,7 +17,9 @@
     "test": "bun run test:gateway && bun run test:backend",
     "dev:gateway": "cd gateway && bun run dev",
     "dev:backend": "cd backend && bun run dev",
-    "dev:frontend": "cd frontend && bun run dev"
+    "dev:frontend": "cd frontend && bun run dev",
+    "agent": "bun run openclaw/agent.ts",
+    "agent:query": "bun run openclaw/agent.ts"
   },
   "devDependencies": {
     "@types/bun": "1.3.8"

@@ -17,11 +17,16 @@
  */
 import express, { type Request, type Response } from 'express'
 import cors from 'cors'
+import { readFileSync, existsSync } from 'fs'
+import { join } from 'path'
 import { getAllActive, getOne, getExecutions, getExecutionById } from './db'
 import { SearchIndex, buildSearchText } from './search'
 import { RegistryReader } from './registry'
 import { proxyTrigger } from './gateway'
 import { toWorkflowResponse } from './types'
+
+// Absolute path to the openclaw/ directory (backend/src/ → ../../openclaw/)
+const OPENCLAW_DIR = join(import.meta.dir, '..', '..', 'openclaw')
 
 // ─── Module-level search index ────────────────────────────────────────────────
 // Rebuilt by listener.ts on every WorkflowListed / WorkflowUpdated event.
@@ -118,6 +123,36 @@ export const createApp = () => {
 		}
 	})
 
+	// ── Openclaw skill files ───────────────────────────────────────────────────
+	// Serves SKILL.md and all reference/example files directly from the backend
+	// so agents and Openclaw instances can load the skill without the frontend.
+	//
+	//   GET /skill.md                       → openclaw/SKILL.md
+	//   GET /skill/references/:file         → openclaw/references/:file
+	//   GET /skill/examples/:file           → openclaw/examples/:file
+
+	const serveSkillFile = (filePath: string, res: Response) => {
+		if (!existsSync(filePath)) return res.status(404).send('Not found')
+		res.setHeader('Content-Type', 'text/markdown; charset=utf-8')
+		res.setHeader('Cache-Control', 'no-cache')
+		res.send(readFileSync(filePath, 'utf-8'))
+	}
+
+	app.get('/skill.md', (_req: Request, res: Response) => {
+		serveSkillFile(join(OPENCLAW_DIR, 'SKILL.md'), res)
+	})
+
+	app.get('/skill/references/:file', (req: Request, res: Response) => {
+		// Only allow .md files, prevent path traversal
+		const file = req.params.file.replace(/[^a-zA-Z0-9._-]/g, '')
+		serveSkillFile(join(OPENCLAW_DIR, 'references', file), res)
+	})
+
+	app.get('/skill/examples/:file', (req: Request, res: Response) => {
+		const file = req.params.file.replace(/[^a-zA-Z0-9._-]/g, '')
+		serveSkillFile(join(OPENCLAW_DIR, 'examples', file), res)
+	})
+
 	return app
 }
 
@@ -150,6 +185,8 @@ if (process.env.NODE_ENV !== 'test') {
 			console.log('  GET  /api/workflows/search?q=<query>')
 			console.log('  GET  /api/workflows/:workflowId')
 			console.log('  POST /api/trigger/:workflowId')
+			console.log('  GET  /skill.md                   ← Openclaw SKILL.md')
+			console.log('  GET  /skill/references/:file     ← Openclaw reference docs')
 		})
 	}
 

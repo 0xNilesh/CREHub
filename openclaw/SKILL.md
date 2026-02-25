@@ -39,16 +39,16 @@ Always read `references/api.md` for endpoint details and `references/payment-flo
 | [payment-flow.md](references/payment-flow.md) | x402 payment flow | Step-by-step USDC payment on Ethereum Sepolia |
 | [workflow-schema.md](references/workflow-schema.md) | Workflow data schema | Field types, price format, input/output definitions |
 
-## Live URLs (hosted)
+## Live URLs
 
 | Resource | URL |
 |----------|-----|
-| This skill (raw) | `http://localhost:3000/crehub/openclaw/SKILL.md` |
-| API reference | `http://localhost:3000/crehub/openclaw/references/api.md` |
-| Payment flow | `http://localhost:3000/crehub/openclaw/references/payment-flow.md` |
-| Workflow schema | `http://localhost:3000/crehub/openclaw/references/workflow-schema.md` |
-| Agent demo | `http://localhost:3000/crehub/openclaw/examples/agent-demo.md` |
-| Sitemap | `http://localhost:3000/sitemap.xml` |
+| **This skill (entry point)** | `http://localhost:4000/skill.md` |
+| API reference | `http://localhost:4000/skill/references/api.md` |
+| Payment flow | `http://localhost:4000/skill/references/payment-flow.md` |
+| Workflow schema | `http://localhost:4000/skill/references/workflow-schema.md` |
+| Agent demo | `http://localhost:4000/skill/examples/agent-demo.md` |
+| Web agent console | `http://localhost:3000/agent` |
 
 ## Quick Reference
 

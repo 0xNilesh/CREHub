@@ -1,3 +1,6 @@
 node_modules
 .next
 .env
+
+# Claude Code memory
+.claude/

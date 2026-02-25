@@ -10,7 +10,8 @@ const NAV_LINKS = [
   { href: '/explorer',        label: 'Explorer' },
   { href: '/dashboard',       label: 'Dashboard' },
   { href: '/list',            label: 'List Workflow' },
-  { href: '/crehub/openclaw', label: 'Agent Skills' },
+  { href: '/agent',           label: 'Agent Console' },
+  { href: '/crehub/openclaw', label: 'Openclaw' },
 ]
 
 // ── Logo mark: abstract interconnected nodes (no brand copying) ───────────────
