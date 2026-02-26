@@ -100,8 +100,9 @@ contract WorkflowRegistry {
     // ─── Creator: list a workflow ─────────────────────────────────────────────
 
     /**
-     * @notice Register a new workflow listing. Caller becomes the creator.
+     * @notice Register a new workflow listing on behalf of any creator address.
      * @param workflowId  Unique ID (e.g. "wf_hf_monitor_01")
+     * @param creatorAddress  Address to record as the workflow creator. Pass address(0) to use msg.sender.
      * @param price       USDC wei per invocation (6 decimals)
      * @param description Short description (≤ 160 chars)
      * @param detailedDescription  Full markdown description
@@ -111,6 +112,7 @@ contract WorkflowRegistry {
      */
     function listWorkflow(
         string calldata workflowId,
+        address creatorAddress,
         uint256 price,
         string calldata description,
         string calldata detailedDescription,
@@ -120,9 +122,11 @@ contract WorkflowRegistry {
     ) external {
         if (_exists[workflowId]) revert WorkflowAlreadyExists(workflowId);
 
+        address creator = creatorAddress == address(0) ? msg.sender : creatorAddress;
+
         _workflows[workflowId] = WorkflowMetadata({
             workflowId: workflowId,
-            creatorAddress: msg.sender,
+            creatorAddress: creator,
             pricePerInvocation: price,
             description: description,
             detailedDescription: detailedDescription,
@@ -141,7 +145,7 @@ contract WorkflowRegistry {
         _workflowIds.push(workflowId);
         _exists[workflowId] = true;
 
-        emit WorkflowListed(workflowId, msg.sender, _workflows[workflowId], _inputs[workflowId], _outputs[workflowId]);
+        emit WorkflowListed(workflowId, creator, _workflows[workflowId], _inputs[workflowId], _outputs[workflowId]);
     }
 
     /**
