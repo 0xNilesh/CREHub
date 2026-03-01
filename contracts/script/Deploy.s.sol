@@ -4,6 +4,7 @@ pragma solidity ^0.8.26;
 import {Script, console} from "forge-std/Script.sol";
 import {WorkflowRegistry} from "../src/WorkflowRegistry.sol";
 import {SettlementVault} from "../src/SettlementVault.sol";
+import {CREHubExecutor} from "../src/CREHubExecutor.sol";
 
 /**
  * @title Deploy
@@ -25,9 +26,10 @@ import {SettlementVault} from "../src/SettlementVault.sol";
  */
 contract Deploy is Script {
     function run() external {
-        address usdc     = vm.envAddress("USDC_ADDRESS");
-        address treasury = vm.envAddress("TREASURY_WALLET");
-        address gateway  = vm.envAddress("GATEWAY_ADDRESS");
+        address usdc        = vm.envAddress("USDC_ADDRESS");
+        address treasury    = vm.envAddress("TREASURY_WALLET");
+        address gateway     = vm.envAddress("GATEWAY_ADDRESS");
+        address cre_forwarder = vm.envAddress("CRE_FORWARDER");
 
         vm.startBroadcast();
 
@@ -45,11 +47,17 @@ contract Deploy is Script {
         vault.setGateway(gateway);
         console.log("vault.setGateway ->", gateway);
 
+        // CRE on-chain executor — receives signed reports from the CRE Forwarder
+        CREHubExecutor executor = new CREHubExecutor(cre_forwarder);
+        console.log("CREHubExecutor deployed at:", address(executor));
+
         vm.stopBroadcast();
 
         console.log("\n=== Deployment complete ===");
         console.log("Copy these into gateway/.env:");
         console.log("WORKFLOW_REGISTRY_ADDRESS=", address(registry));
         console.log("SETTLEMENT_VAULT_ADDRESS=", address(vault));
+        console.log("\nCopy this into workflows/aave-health-monitor/config.json:");
+        console.log("executorAddress=", address(executor));
     }
 }

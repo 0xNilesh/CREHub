@@ -76,7 +76,7 @@ export const parseSimulateOutput = (stdout: string): SimulateResult => {
 
 // ─── runSimulate ──────────────────────────────────────────────────────────────
 
-export const runSimulate = async (workflowDir: string, input: unknown): Promise<SimulateResult> => {
+export const runSimulate = async (workflowDir: string, input: unknown, broadcast?: boolean): Promise<SimulateResult> => {
 	// Ensure workflow directory exists (e.g. for tests using /tmp paths)
 	mkdirSync(workflowDir, { recursive: true })
 
@@ -96,6 +96,9 @@ export const runSimulate = async (workflowDir: string, input: unknown): Promise<
 		PATH: `${creBin}${pathSep}${process.env.PATH ?? ''}`,
 	}
 
+	// Enable broadcast from env or explicit parameter
+	const shouldBroadcast = broadcast ?? process.env.CRE_BROADCAST === 'true'
+
 	// Build the cre CLI args (same on all platforms)
 	const creArgs = [
 		'workflow', 'simulate', '.',
@@ -104,6 +107,7 @@ export const runSimulate = async (workflowDir: string, input: unknown): Promise<
 		'--non-interactive',
 		'--trigger-index', '0',
 		'--http-payload', `./${HTTP_PAYLOAD_FILENAME}`,
+		...(shouldBroadcast ? ['--broadcast'] : []),
 	]
 
 	// On Windows: invoke via powershell.exe (cmd.exe hangs indefinitely).

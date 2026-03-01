@@ -12,11 +12,12 @@ import { loadMetadata, runDoctorChecks, validateOutputSchema } from '../utils/va
 // ─── Parse flags ──────────────────────────────────────────────────────────────
 
 function parseArgs(args: string[]) {
-  const opts = { workflowDir: '.', payload: null as string | null, recompile: false, verbose: false }
+  const opts = { workflowDir: '.', payload: null as string | null, recompile: false, verbose: false, broadcast: false }
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--payload' && args[i + 1]) { opts.payload = args[++i]; continue }
     if (args[i] === '--recompile') { opts.recompile = true; continue }
     if (args[i] === '--verbose')   { opts.verbose   = true; continue }
+    if (args[i] === '--broadcast') { opts.broadcast  = true; continue }
     if (!args[i].startsWith('--')) opts.workflowDir = args[i]
   }
   return opts
@@ -67,6 +68,7 @@ function runSimulate(
   workflowDir: string,
   payloadPath: string,
   verbose: boolean,
+  broadcast: boolean = false,
 ): Promise<ReturnType<typeof parseSimulateOutput> & { durationMs: number }> {
   return new Promise((resolve) => {
     const start  = Date.now()
@@ -84,6 +86,7 @@ function runSimulate(
       '--non-interactive',
       '--trigger-index', '0',
       '--http-payload', payloadPath,
+      ...(broadcast ? ['--broadcast'] : []),
     ]
 
     const [exe, args] = isWin
@@ -252,7 +255,8 @@ export async function cmdTest(args: string[]) {
   note('cre workflow simulate  (streaming runtime logs below)')
   miniDiv()
 
-  const result = await runSimulate(workflowDir, payloadFile, opts.verbose)
+  if (opts.broadcast) note('--broadcast enabled: on-chain write will execute')
+  const result = await runSimulate(workflowDir, payloadFile, opts.verbose, opts.broadcast)
 
   miniDiv()
   blank()

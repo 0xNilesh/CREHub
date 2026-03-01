@@ -43,10 +43,18 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-function JsonBlock({ label, json }: { label: string; json: string }) {
+function JsonBlock({ label, json, omitKeys = [] }: { label: string; json: string; omitKeys?: string[] }) {
   if (!json) return null
   let pretty = json
-  try { pretty = JSON.stringify(JSON.parse(json), null, 2) } catch {}
+  try {
+    const parsed = JSON.parse(json)
+    if (omitKeys.length > 0 && typeof parsed === 'object' && parsed !== null) {
+      const filtered = Object.fromEntries(Object.entries(parsed).filter(([k]) => !omitKeys.includes(k)))
+      pretty = JSON.stringify(filtered, null, 2)
+    } else {
+      pretty = JSON.stringify(parsed, null, 2)
+    }
+  } catch {}
   return (
     <div>
       <p className="text-xs text-white/35 uppercase tracking-wide mb-2">{label}</p>
@@ -55,6 +63,18 @@ function JsonBlock({ label, json }: { label: string; json: string }) {
       </pre>
     </div>
   )
+}
+
+/** Extract onChainTxHash from outputsJson if present */
+function parseOnChainTxHash(outputsJson: string): string | null {
+  if (!outputsJson) return null
+  try {
+    const parsed = JSON.parse(outputsJson) as Record<string, unknown>
+    const hash = parsed?.onChainTxHash
+    return typeof hash === 'string' && hash.startsWith('0x') ? hash : null
+  } catch {
+    return null
+  }
 }
 
 export default function ExecutionDetailPage({ params }: { params: { executionId: string } }) {
@@ -86,6 +106,8 @@ export default function ExecutionDetailPage({ params }: { params: { executionId:
       </div>
     )
   }
+
+  const onChainTxHash = ex.status === 'success' ? parseOnChainTxHash(ex.outputsJson) : null
 
   return (
     <div className="min-h-screen pt-24 pb-20">
@@ -145,13 +167,36 @@ export default function ExecutionDetailPage({ params }: { params: { executionId:
           <Field label="Settlement Tx (on-chain)">
             <TxLink hash={ex.settlementTxHash} label="settlement" />
           </Field>
+          {onChainTxHash && (
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-white/35 uppercase tracking-wide">CRE Broadcast Tx</span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border border-emerald-500/40 bg-emerald-500/10 text-emerald-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  Proof of Execution
+                </span>
+              </div>
+              <div className="text-sm text-white/80">
+                <TxLink hash={onChainTxHash} label="cre broadcast" />
+              </div>
+              <p className="text-xs text-white/25 mt-0.5">
+                Result hash written to CREHubExecutor on Sepolia via Chainlink CRE Forwarder
+              </p>
+            </div>
+          )}
         </div>
 
         {/* I/O card */}
         <div className="card p-6 space-y-5">
           <h2 className="text-sm font-semibold text-white/70 uppercase tracking-wide mb-2">Workflow I/O</h2>
           <JsonBlock label="Input" json={ex.inputsJson} />
-          {ex.status === 'success' && <JsonBlock label="Output" json={ex.outputsJson} />}
+          {ex.status === 'success' && (
+            <JsonBlock
+              label="Output"
+              json={ex.outputsJson}
+              omitKeys={onChainTxHash ? ['onChainTxHash'] : []}
+            />
+          )}
           {ex.status === 'failure' && ex.errorMessage && (
             <div>
               <p className="text-xs text-white/35 uppercase tracking-wide mb-2">Error</p>

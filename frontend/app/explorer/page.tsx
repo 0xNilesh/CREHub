@@ -7,6 +7,15 @@ import { api } from '@/lib/api'
 import type { ExecutionsPage } from '@/lib/types'
 import { shortHash, shortAddr, formatUSDC, SEPOLIA_EXPLORER } from '@/lib/types'
 
+function parseOnChainTxHash(outputsJson: string): string | null {
+  if (!outputsJson) return null
+  try {
+    const parsed = JSON.parse(outputsJson) as Record<string, unknown>
+    const hash = parsed?.onChainTxHash
+    return typeof hash === 'string' && hash.startsWith('0x') ? hash : null
+  } catch { return null }
+}
+
 const PAGE_SIZE = 20
 
 function StatusBadge({ status }: { status: string }) {
@@ -72,6 +81,7 @@ export default function ExplorerPage() {
                   <th className="px-4 py-3 text-left">Amount</th>
                   <th className="px-4 py-3 text-left">Status</th>
                   <th className="px-4 py-3 text-left">Settlement Tx</th>
+                  <th className="px-4 py-3 text-left">CRE Broadcast</th>
                   <th className="px-4 py-3 text-left">Time</th>
                 </tr>
               </thead>
@@ -79,7 +89,7 @@ export default function ExplorerPage() {
                 {isLoading
                   ? Array.from({ length: 8 }).map((_, i) => (
                     <tr key={i} className="border-b border-white/[0.04]">
-                      {Array.from({ length: 7 }).map((_, j) => (
+                      {Array.from({ length: 8 }).map((_, j) => (
                         <td key={j} className="px-4 py-3">
                           <div className="skeleton h-4 w-24 rounded" />
                         </td>
@@ -89,7 +99,7 @@ export default function ExplorerPage() {
                   : data?.items.length === 0
                   ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-16 text-center text-white/30">
+                      <td colSpan={8} className="px-4 py-16 text-center text-white/30">
                         No executions yet. Trigger a workflow to get started.
                       </td>
                     </tr>
@@ -123,6 +133,23 @@ export default function ExplorerPage() {
                             {shortHash(ex.settlementTxHash)}
                           </a>
                         ) : '—'}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs">
+                        {(() => {
+                          const creTx = parseOnChainTxHash(ex.outputsJson)
+                          return creTx ? (
+                            <a
+                              href={`${SEPOLIA_EXPLORER}/tx/${creTx}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-emerald-400 hover:underline"
+                              title={creTx}
+                            >
+                              <span>⛓</span>
+                              {shortHash(creTx)}
+                            </a>
+                          ) : <span className="text-white/20">—</span>
+                        })()}
                       </td>
                       <td className="px-4 py-3 text-xs text-white/40">
                         {new Date(ex.triggeredAt).toLocaleString()}

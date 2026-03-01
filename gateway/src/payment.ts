@@ -224,7 +224,7 @@ export const holdAndExecute = async (params: {
 	// 2. Run `cre workflow simulate`
 	let simulateResult: SimulateResult
 	try {
-		simulateResult = await simulate(workflowDir, input)
+		simulateResult = await simulate(workflowDir, input, true)
 	} catch (err) {
 		const errorMessage = err instanceof Error ? err.message : 'Simulation process error'
 		const tx = await settlement.settleFailure({ executionId, errorMessage })

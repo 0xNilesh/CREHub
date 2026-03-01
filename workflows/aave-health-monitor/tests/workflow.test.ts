@@ -318,7 +318,7 @@ describe('metadata.json structure', () => {
 			(i: { name: string }) => i.name === 'walletAddress',
 		)
 		expect(walletInput).toBeDefined()
-		expect(walletInput.required).toBe(true)
+		expect(walletInput!.required).toBe(true)
 	})
 
 	test('threshold inputs are optional', async () => {
@@ -326,7 +326,7 @@ describe('metadata.json structure', () => {
 		for (const name of ['alertThreshold', 'criticalThreshold']) {
 			const field = metadata.default.inputs.find((i: { name: string }) => i.name === name)
 			expect(field).toBeDefined()
-			expect(field.required).toBe(false)
+			expect(field!.required).toBe(false)
 		}
 	})
 })

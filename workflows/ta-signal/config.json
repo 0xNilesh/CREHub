@@ -2,5 +2,9 @@
   "gatewayPublicKey": "0xFBDf4Dc13ed423C1E534Da0b2ed229B6a376a31f",
   "workflowId": "wf_ta_signal_01",
   "taapiSecret": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbHVlIjoiNjg1MDdiNGM4MDZmZjE2NTFlYzdhMmQxIiwiaWF0IjoxNzcxNzgzNTY1LCJleHAiOjMzMjc2MjQ3NTY1fQ.FmRdAdH4jmpxlxc_fO0qf3ySSnuNjY8IX0wDYfRbDu0",
-  "openaiApiKey": "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"
+  "openaiApiKey": "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",
+  "chainSelectorSepolia": "ethereum-testnet-sepolia",
+  "executorAddress": "0x2b8Ad3f705Db838508bF93665FC1EcC361390Aa3",
+  "gasLimit": 200000,
+  "skipOnChainWrite": false
 }

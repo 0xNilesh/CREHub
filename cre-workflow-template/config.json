@@ -1,5 +1,9 @@
 {
   "gatewayPublicKey": "REPLACE_WITH_CREHUB_GATEWAY_EVM_ADDRESS",
   "workflowId": "replace-with-your-cre-workflow-id",
-  "apiUrl": "https://api.example.com"
+  "apiUrl": "https://api.example.com",
+  "chainSelectorSepolia": "ethereum-testnet-sepolia",
+  "executorAddress": "0x2b8Ad3f705Db838508bF93665FC1EcC361390Aa3",
+  "gasLimit": 200000,
+  "skipOnChainWrite": true
 }

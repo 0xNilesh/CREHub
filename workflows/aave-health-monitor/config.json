@@ -1,4 +1,8 @@
 {
   "gatewayPublicKey": "0xFBDf4Dc13ed423C1E534Da0b2ed229B6a376a31f",
-  "workflowId": "wf_aave_health_monitor_01"
+  "workflowId": "wf_aave_health_monitor_01",
+  "chainSelectorSepolia": "ethereum-testnet-sepolia",
+  "executorAddress": "0x2b8Ad3f705Db838508bF93665FC1EcC361390Aa3",
+  "gasLimit": 200000,
+  "skipOnChainWrite": false
 }

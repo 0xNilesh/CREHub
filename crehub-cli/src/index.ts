@@ -85,6 +85,7 @@ function printHelp() {
   const flags: [string, string, string][] = [
     ['test',   '--payload <file|json>', 'Override the HTTP trigger payload'],
     ['test',   '--recompile',           'Force WASM recompilation before test'],
+    ['test',   '--broadcast',           'Enable on-chain broadcast via CRE Forwarder'],
     ['test',   '--verbose',             'Print raw simulation output'],
     ['*',      '--help',                'Show help for any command'],
     ['*',      '--version, -v',         'Print CLI version'],
@@ -181,6 +182,7 @@ const COMMAND_HELP: Record<string, () => void> = {
     const flags: [string, string][] = [
       ['--payload <file|json>', 'Override trigger payload (file path or inline JSON)'],
       ['--recompile',           'Force WASM recompilation even if WASM is up-to-date'],
+      ['--broadcast',           'Enable on-chain broadcast via CRE Forwarder'],
       ['--verbose',             'Print the full raw simulation output'],
     ]
     for (const [f, d] of flags) {
