@@ -1,0 +1,30 @@
+{
+  "workflowId": "wf_dummy_workflow_01",
+  "creatorAddress": "0xFBDf4Dc13ed423C1E534Da0b2ed229B6a376a31f",
+  "pricePerInvocation": "10000",
+  "description": "it is adummy workflow",
+  "detailedDescription": "it is detailed dummy workflow",
+  "category": "monitoring",
+  "inputs": [
+    {
+      "name": "dummy",
+      "type": "string",
+      "description": "dummy",
+      "required": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "result",
+      "type": "string",
+      "description": "Workflow result.",
+      "required": true
+    },
+    {
+      "name": "timestamp",
+      "type": "string",
+      "description": "ISO-8601 execution timestamp.",
+      "required": true
+    }
+  ]
+}
