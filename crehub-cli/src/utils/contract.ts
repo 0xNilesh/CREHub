@@ -13,8 +13,8 @@ import { sepolia } from 'viem/chains'
 import { getConfig } from './config.ts'
 
 const REGISTRY_ABI = parseAbi([
-  'function listWorkflow(string workflowId, uint256 price, string description, string detailedDescription, string category, (string name, string fieldType, string description, bool required)[] inputs, (string name, string fieldType, string description, bool required)[] outputs) external',
-  'function workflowExists(string workflowId) view returns (bool)',
+  'function listWorkflow(string workflowId, address creatorAddress, uint256 price, string description, string detailedDescription, string category, (string name, string fieldType, string description, bool required)[] inputs, (string name, string fieldType, string description, bool required)[] outputs) external',
+  'function getAllWorkflowIds() view returns (string[])',
 ])
 
 export const getPublicClient = () => {
@@ -26,12 +26,12 @@ export const workflowExists = async (workflowId: string): Promise<boolean> => {
   const { registryAddress } = getConfig()
   const client = getPublicClient()
   try {
-    return await client.readContract({
+    const ids = await client.readContract({
       address: registryAddress as Hex,
       abi: REGISTRY_ABI,
-      functionName: 'workflowExists',
-      args: [workflowId],
-    }) as boolean
+      functionName: 'getAllWorkflowIds',
+    }) as string[]
+    return ids.includes(workflowId)
   } catch {
     return false
   }
@@ -64,6 +64,7 @@ export const registerWorkflow = async (params: {
     functionName: 'listWorkflow',
     args: [
       params.workflowId,
+      account.address,
       params.price,
       params.description,
       params.detailedDescription,

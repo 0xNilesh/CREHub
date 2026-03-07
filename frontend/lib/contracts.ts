@@ -9,6 +9,7 @@ export const REGISTRY_ABI = [
     stateMutability: 'nonpayable',
     inputs: [
       { name: 'workflowId',          type: 'string' },
+      { name: 'creatorAddress',      type: 'address' },
       { name: 'price',               type: 'uint256' },
       { name: 'description',         type: 'string' },
       { name: 'detailedDescription', type: 'string' },

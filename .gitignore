@@ -4,3 +4,9 @@ node_modules
 
 # Claude Code memory
 .claude/
+.DS_Store
+
+# logs
+.backend.log
+.frontend.log
+.gateway.log
