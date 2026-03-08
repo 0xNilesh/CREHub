@@ -91,6 +91,7 @@ export default function ListPage() {
         functionName: 'listWorkflow',
         args: [
           form.workflowId,
+          address,
           BigInt(form.pricePerInvocation || '0'),
           form.description,
           form.detailedDescription,

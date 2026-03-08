@@ -1,0 +1,22 @@
+# CRE WORKFLOW SETTINGS — wf_dummy_workflow_01
+
+local-simulation:
+  user-workflow:
+    workflow-name: "crehub-wf_dummy_workflow_01-local"
+  workflow-artifacts:
+    workflow-path: "./src/index.ts"
+    config-path: "./config.json"
+
+staging-settings:
+  user-workflow:
+    workflow-name: "crehub-wf_dummy_workflow_01-staging"
+  workflow-artifacts:
+    workflow-path: "./src/index.ts"
+    config-path: "./config.json"
+
+production-settings:
+  user-workflow:
+    workflow-name: "crehub-wf_dummy_workflow_01-production"
+  workflow-artifacts:
+    workflow-path: "./src/index.ts"
+    config-path: "./config.json"

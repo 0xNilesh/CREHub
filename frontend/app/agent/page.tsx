@@ -269,7 +269,19 @@ export default function AgentPage() {
       })
       pushLine('tx_broadcast', `Broadcasting USDC transfer...  ${truncate(txHash, 22)}`)
 
-      await publicClient.waitForTransactionReceipt({ hash: txHash, confirmations: 1 })
+      // Poll for receipt directly — handles already-confirmed txs immediately
+      // (waitForTransactionReceipt can miss txs confirmed before polling starts)
+      {
+        let receipt = null
+        for (let attempt = 0; attempt < 60; attempt++) {
+          try {
+            receipt = await publicClient.getTransactionReceipt({ hash: txHash })
+            if (receipt) break
+          } catch { /* not yet indexed — keep polling */ }
+          await new Promise(r => setTimeout(r, 5_000))
+        }
+        if (!receipt) throw new Error(`Timed out waiting for receipt of ${txHash}`)
+      }
       pushLine('tx_confirmed', `Transfer confirmed: ${truncate(txHash, 22)}`)
 
       // ── Step 5: trigger execution via server proxy ──────────────────────────

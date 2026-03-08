@@ -1,0 +1,24 @@
+{
+  "name": "@crehub/workflow-dummy-workflow",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CREHub workflow — wf_dummy_workflow_01",
+  "scripts": {
+    "cre-compile": "bun scripts/cre-compile.ts",
+    "simulate": "cre workflow simulate . --target local-simulation",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@chainlink/cre-sdk": "^1.1.1",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.8",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "bun": ">=1.2.21"
+  }
+}

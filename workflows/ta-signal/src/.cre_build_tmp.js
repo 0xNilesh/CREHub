@@ -15787,194 +15787,139 @@ function encodeReport(workflowId, resultHash) {
 function hashOutput(output) {
   return keccak256(toHex(JSON.stringify(output)));
 }
-var CHAINLINK_PRICES = {
-  ETH: {
-    asset: "ETH",
-    priceUsd: 2400,
-    feedAddress: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
-  },
-  WBTC: {
-    asset: "WBTC",
-    priceUsd: 65000,
-    feedAddress: "0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c"
-  },
-  USDC: {
-    asset: "USDC",
-    priceUsd: 1,
-    feedAddress: "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6"
-  },
-  DAI: {
-    asset: "DAI",
-    priceUsd: 1,
-    feedAddress: "0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9"
-  },
-  LINK: {
-    asset: "LINK",
-    priceUsd: 18.5,
-    feedAddress: "0x2c1d072e956AFFC0D435Cb7AC38EF18d24d9127c"
-  },
-  WSTETH: {
-    asset: "WSTETH",
-    priceUsd: 2820,
-    feedAddress: "0x8770d8dEb4Bc923bf929cd260280B5F1dd69564D"
-  }
-};
-var getPriceUsd = (asset) => {
-  return CHAINLINK_PRICES[asset]?.priceUsd ?? 1;
-};
-var DEMO_WALLETS = {
-  HEALTHY: "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA01",
-  WARNING: "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA02",
-  CRITICAL: "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA03"
-};
-var SAMPLE_POSITIONS = {
-  [DEMO_WALLETS.HEALTHY]: {
-    collateral: [
-      { asset: "ETH", amount: 2, liquidationThreshold: 0.825 },
-      { asset: "WBTC", amount: 0.1, liquidationThreshold: 0.7 }
-    ],
-    debt: [
-      { asset: "USDC", amount: 4000 },
-      { asset: "DAI", amount: 500 }
-    ]
-  },
-  [DEMO_WALLETS.WARNING]: {
-    collateral: [
-      { asset: "ETH", amount: 2, liquidationThreshold: 0.825 }
-    ],
-    debt: [
-      { asset: "USDC", amount: 3450 }
-    ]
-  },
-  [DEMO_WALLETS.CRITICAL]: {
-    collateral: [
-      { asset: "ETH", amount: 1, liquidationThreshold: 0.825 }
-    ],
-    debt: [
-      { asset: "USDC", amount: 1940 }
-    ]
-  }
-};
-var DEFAULT_POSITION = {
-  collateral: [
-    { asset: "ETH", amount: 1.5, liquidationThreshold: 0.825 },
-    { asset: "WSTETH", amount: 0.5, liquidationThreshold: 0.8 }
-  ],
-  debt: [
-    { asset: "USDC", amount: 2000 }
-  ]
-};
 var configSchema = exports_external.object({
   gatewayPublicKey: exports_external.string(),
   workflowId: exports_external.string(),
+  taapiSecret: exports_external.string(),
+  openaiApiKey: exports_external.string(),
   chainSelectorSepolia: exports_external.string(),
   executorAddress: exports_external.string(),
   gasLimit: exports_external.number(),
   skipOnChainWrite: exports_external.boolean().optional()
 });
 var inputSchema = exports_external.object({
-  walletAddress: exports_external.string(),
-  alertThreshold: exports_external.string().optional(),
-  criticalThreshold: exports_external.string().optional()
+  symbol: exports_external.string().default("BTC/USDT"),
+  exchange: exports_external.string().default("binance"),
+  interval: exports_external.string().default("1h")
 });
-var DEFAULT_ALERT_THRESHOLD = 1.2;
-var DEFAULT_CRITICAL_THRESHOLD = 1.05;
-var computeHealthFactor = (collateral, debt) => {
-  let collateralUsd = 0;
-  let weightedCollateralUsd = 0;
-  for (const c of collateral) {
-    const valueUsd = c.amount * getPriceUsd(c.asset);
-    collateralUsd += valueUsd;
-    weightedCollateralUsd += valueUsd * c.liquidationThreshold;
-  }
-  let debtUsd = 0;
-  for (const d of debt) {
-    debtUsd += d.amount * getPriceUsd(d.asset);
-  }
-  const healthFactor = debtUsd === 0 ? Infinity : weightedCollateralUsd / debtUsd;
-  const blendedLiqThreshold = collateralUsd === 0 ? 0 : weightedCollateralUsd / collateralUsd;
-  return {
-    healthFactor: Math.round(healthFactor * 1000) / 1000,
-    collateralUsd: Math.round(collateralUsd * 100) / 100,
-    weightedCollateralUsd: Math.round(weightedCollateralUsd * 100) / 100,
-    debtUsd: Math.round(debtUsd * 100) / 100,
-    liquidationThreshold: Math.round(blendedLiqThreshold * 1e4) / 1e4
+function encode(obj) {
+  return new TextEncoder().encode(JSON.stringify(obj));
+}
+function parseJSON(text) {
+  const stripped = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+  return JSON.parse(stripped);
+}
+function fetchIndicators(runtime2, http, input) {
+  const { taapiSecret } = runtime2.config;
+  const body = {
+    secret: taapiSecret,
+    construct: {
+      exchange: input.exchange,
+      symbol: input.symbol,
+      interval: input.interval,
+      indicators: [
+        { id: "rsi", indicator: "rsi" },
+        { id: "macd", indicator: "macd" },
+        { id: "bbands", indicator: "bbands" },
+        { id: "candle", indicator: "candle" }
+      ]
+    }
   };
-};
-var classifyRisk = (healthFactor, alertThreshold, criticalThreshold) => {
-  if (healthFactor < 1)
-    return "liquidatable";
-  if (healthFactor < criticalThreshold)
-    return "critical";
-  if (healthFactor < alertThreshold)
-    return "warning";
-  return "safe";
-};
-var buildRecommendation = (riskLevel, healthFactor, debtUsd, weightedCollateralUsd, alertThreshold, walletAddress) => {
-  const repayToSafe = Math.max(0, debtUsd - weightedCollateralUsd / alertThreshold);
-  switch (riskLevel) {
-    case "safe":
-      return `Position is healthy (HF ${healthFactor}). No action required. Monitor if ETH drops >15%.`;
-    case "warning":
-      return `Health factor ${healthFactor} is below alert threshold ${alertThreshold}. Repay ~$${repayToSafe.toFixed(2)} debt or add equivalent collateral to return to safe zone.`;
-    case "critical":
-      return `URGENT: Health factor ${healthFactor} is critically low. Repay ~$${repayToSafe.toFixed(2)} debt immediately. A 2–3% price drop could trigger liquidation for ${walletAddress}.`;
-    case "liquidatable":
-      return `LIQUIDATION IMMINENT: Health factor ${healthFactor} is below 1.0. Position ${walletAddress} is eligible for liquidation now. Add collateral or repay all debt immediately.`;
+  runtime2.log("[ta-signal] Calling TAAPI bulk endpoint");
+  const resp = http.sendRequest(runtime2, {
+    url: "https://api.taapi.io/bulk",
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: encode(body),
+    cache_settings: { store: false }
+  }).result();
+  if (resp.statusCode < 200 || resp.statusCode >= 300) {
+    throw new Error(`TAAPI error ${resp.statusCode}: ${new TextDecoder().decode(resp.body)}`);
   }
-};
-var evaluatePosition = (input) => {
-  const alertThreshold = parseFloat(input.alertThreshold || String(DEFAULT_ALERT_THRESHOLD));
-  const criticalThreshold = parseFloat(input.criticalThreshold || String(DEFAULT_CRITICAL_THRESHOLD));
-  const position = SAMPLE_POSITIONS[input.walletAddress] ?? DEFAULT_POSITION;
-  const { healthFactor, collateralUsd, weightedCollateralUsd, debtUsd, liquidationThreshold } = computeHealthFactor(position.collateral, position.debt);
-  const riskLevel = classifyRisk(healthFactor, alertThreshold, criticalThreshold);
-  const recommendation = buildRecommendation(riskLevel, healthFactor, debtUsd, weightedCollateralUsd, alertThreshold, input.walletAddress);
-  const positions = [
-    ...position.collateral.map((c) => {
-      const valueUsd = Math.round(c.amount * getPriceUsd(c.asset) * 100) / 100;
-      return {
-        asset: c.asset,
-        type: "collateral",
-        amount: c.amount,
-        valueUsd,
-        liquidationThreshold: c.liquidationThreshold,
-        weightedValueUsd: Math.round(valueUsd * c.liquidationThreshold * 100) / 100
-      };
-    }),
-    ...position.debt.map((d) => ({
-      asset: d.asset,
-      type: "debt",
-      amount: d.amount,
-      valueUsd: Math.round(d.amount * getPriceUsd(d.asset) * 100) / 100
-    }))
-  ];
-  const pricesUsed = Object.fromEntries(Object.entries(CHAINLINK_PRICES).map(([k, v]) => [k, v.priceUsd]));
+  const raw = parseJSON(new TextDecoder().decode(resp.body));
+  const byId = {};
+  for (const item of raw.data) {
+    byId[item.id] = item.result;
+  }
+  runtime2.log(`[ta-signal] RSI=${byId["rsi"]?.value}, MACD hist=${byId["macd"]?.valueMACD}`);
   return {
-    walletAddress: input.walletAddress,
-    healthFactor,
-    riskLevel,
-    alertThreshold,
-    criticalThreshold,
-    collateralUsd,
-    weightedCollateralUsd,
-    debtUsd,
-    liquidationThreshold,
-    recommendation,
-    positions,
-    pricesUsed,
-    dataSource: "chainlink-sample",
-    timestamp: new Date().toISOString()
+    rsi: byId["rsi"]?.value ?? 50,
+    macd: byId["macd"]?.valueMACD ?? 0,
+    macdSignal: byId["macd"]?.valueMACDSignal ?? 0,
+    macdHist: byId["macd"]?.valueMACDHist ?? 0,
+    bbUpper: byId["bbands"]?.valueUpperBand ?? 0,
+    bbMiddle: byId["bbands"]?.valueMiddleBand ?? 0,
+    bbLower: byId["bbands"]?.valueLowerBand ?? 0,
+    price: byId["candle"]?.close ?? 0
   };
-};
+}
+function fetchDecision(runtime2, http, input, ind) {
+  const { openaiApiKey } = runtime2.config;
+  const userMsg = `Analyze the following technical indicators for ${input.symbol} on the ${input.interval} timeframe and provide a trading signal.
+
+Indicators:
+- RSI: ${ind.rsi.toFixed(2)}
+- MACD: ${ind.macd.toFixed(4)}, Signal: ${ind.macdSignal.toFixed(4)}, Histogram: ${ind.macdHist.toFixed(4)}
+- Bollinger Bands: Upper=${ind.bbUpper.toFixed(2)}, Middle=${ind.bbMiddle.toFixed(2)}, Lower=${ind.bbLower.toFixed(2)}
+- Current Price: ${ind.price.toFixed(2)}
+
+Respond with ONLY a JSON object in this exact format (no markdown, no explanation outside JSON):
+{"decision":"BUY"|"SELL"|"HOLD","confidence":<0-1>,"reason":"<one sentence>"}`;
+  const payload = {
+    model: "gpt-4o-mini",
+    messages: [
+      {
+        role: "system",
+        content: "You are a professional crypto technical analyst. You respond only with valid JSON as instructed."
+      },
+      { role: "user", content: userMsg }
+    ],
+    temperature: 0.2,
+    max_tokens: 200
+  };
+  runtime2.log("[ta-signal] Calling OpenAI gpt-4o-mini");
+  const resp = http.sendRequest(runtime2, {
+    url: "https://api.openai.com/v1/chat/completions",
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${openaiApiKey}`
+    },
+    body: encode(payload),
+    cache_settings: { store: false }
+  }).result();
+  if (resp.statusCode < 200 || resp.statusCode >= 300) {
+    throw new Error(`OpenAI error ${resp.statusCode}: ${new TextDecoder().decode(resp.body)}`);
+  }
+  const json = parseJSON(new TextDecoder().decode(resp.body));
+  const content = json.choices?.[0]?.message?.content ?? "";
+  runtime2.log(`[ta-signal] OpenAI response: ${content}`);
+  const parsed = parseJSON(content);
+  const decision = ["BUY", "SELL", "HOLD"].includes(parsed.decision) ? parsed.decision : "HOLD";
+  return {
+    decision,
+    confidence: Math.min(1, Math.max(0, Number(parsed.confidence) || 0)),
+    reason: String(parsed.reason ?? "")
+  };
+}
 var onHTTPTrigger = (runtime2, payload) => {
-  runtime2.log("CREHub aave-health-monitor trigger received");
+  runtime2.log("[ta-signal] Trigger received");
   const rawInput = decodeJson(payload.input);
   const input = inputSchema.parse(rawInput);
-  runtime2.log(`Input: wallet=${input.walletAddress} alertThreshold=${input.alertThreshold ?? DEFAULT_ALERT_THRESHOLD} criticalThreshold=${input.criticalThreshold ?? DEFAULT_CRITICAL_THRESHOLD}`);
-  const output = evaluatePosition(input);
-  runtime2.log(`HF=${output.healthFactor} riskLevel=${output.riskLevel} collateral=$${output.collateralUsd} debt=$${output.debtUsd}`);
-  runtime2.log(`Recommendation: ${output.recommendation}`);
+  runtime2.log(`[ta-signal] symbol=${input.symbol} exchange=${input.exchange} interval=${input.interval}`);
+  const http = new ClientCapability2;
+  const indicators = fetchIndicators(runtime2, http, input);
+  const { decision, confidence, reason } = fetchDecision(runtime2, http, input, indicators);
+  const output = {
+    decision,
+    confidence,
+    reason,
+    indicators,
+    symbol: input.symbol,
+    interval: input.interval,
+    timestamp: new Date().toISOString()
+  };
+  runtime2.log(`[ta-signal] Result: ${decision} (confidence=${confidence})`);
   if (runtime2.config.skipOnChainWrite) {
     runtime2.log("[on-chain] skipOnChainWrite=true — skipping broadcast (local simulation)");
     return output;
@@ -16027,11 +15972,5 @@ main().catch(sendErrorResponse);
 export {
   onHTTPTrigger,
   main,
-  inputSchema,
-  evaluatePosition,
-  computeHealthFactor,
-  classifyRisk,
-  buildRecommendation,
-  DEFAULT_CRITICAL_THRESHOLD,
-  DEFAULT_ALERT_THRESHOLD
+  inputSchema
 };
