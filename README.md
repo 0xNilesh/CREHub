@@ -30,6 +30,69 @@ An agent needs to check a DeFi health factor, run a technical analysis signal, o
 
 ---
 
+## CRE Integration — Code References
+
+CRE code reference  -
+
+### 1. HTTP Trigger — Workflow locked to CREHub gateway key
+
+Workflows use `HTTPCapability.trigger()` with `authorizedKeys` — only the CREHub gateway's ECDSA public key can fire them. No other caller can trigger execution.
+
+| File | What it does |
+|------|-------------|
+| [`workflows/aave-health-monitor/src/index.ts#L281-L288`](https://github.com/0xNilesh/CREHub/blob/main/workflows/aave-health-monitor/src/index.ts#L281-L288) | `httpCapability.trigger({ authorizedKeys: [{ type: 'KEY_TYPE_ECDSA_EVM', publicKey: config.gatewayPublicKey }] })` |
+| [`workflows/ta-signal/src/index.ts#L296-L303`](https://github.com/0xNilesh/CREHub/blob/main/workflows/ta-signal/src/index.ts#L296-L303) | Same pattern for the TA Signal workflow |
+
+---
+
+### 2. `cre workflow simulate` — Gateway invocation
+
+The gateway shells out to the CRE CLI to execute workflows locally. The full argument construction, payload writing, and output parsing is handled in a single module.
+
+| File | What it does |
+|------|-------------|
+| [`gateway/src/simulate.ts#L79-L111`](https://github.com/0xNilesh/CREHub/blob/main/gateway/src/simulate.ts#L79-L111) | `runSimulate()` — writes `http_trigger_payload.json`, builds CRE CLI args, spawns `cre workflow simulate` |
+| [`gateway/src/simulate.ts#L87`](https://github.com/0xNilesh/CREHub/blob/main/gateway/src/simulate.ts#L87) | `CRE_TARGET` env var selects between `local-simulation` / `staging-settings` / `production-settings` |
+| [`gateway/src/simulate.ts#L103-L110`](https://github.com/0xNilesh/CREHub/blob/main/gateway/src/simulate.ts#L103-L110) | Full CLI args: `workflow simulate . -R . --target <target> --non-interactive --broadcast` |
+| [`gateway/src/payment.ts#L224-L227`](https://github.com/0xNilesh/CREHub/blob/main/gateway/src/payment.ts#L224-L227) | Where `runSimulate()` is called inside the payment-settle flow |
+
+---
+
+### 3. ETH-signed JWT — CRE Gateway authentication
+
+CREHub signs every CRE Gateway request with an Ethereum ECDSA JWT. Header `{ alg: "ETH" }`, payload includes a SHA-256 digest of the JSON-RPC request body, signed with `secp256k1`.
+
+| File | What it does |
+|------|-------------|
+| [`gateway/src/jwt.ts#L1-L11`](https://github.com/0xNilesh/CREHub/blob/main/gateway/src/jwt.ts#L1-L11) | Module header — JWT format spec (ported from CRE SDK reference implementation) |
+| [`gateway/src/jwt.ts`](https://github.com/0xNilesh/CREHub/blob/main/gateway/src/jwt.ts) | Full ETH-signed JWT creation using viem `privateKeyToAccount` + `signMessage` |
+
+---
+
+### 4. `WorkflowResultStore` — On-chain CRE execution proof
+
+After every successful `cre workflow simulate`, the gateway writes `keccak256(outputJson)` to `WorkflowResultStore` on Sepolia — a permanent, verifiable on-chain record of CRE execution even before full DON deployment.
+
+| File | What it does |
+|------|-------------|
+| [`gateway/src/on-chain-result.ts#L27-L30`](https://github.com/0xNilesh/CREHub/blob/main/gateway/src/on-chain-result.ts#L27-L30) | `storeResult(workflowId, resultHash)` ABI — function + `ResultStored` event |
+| [`gateway/src/on-chain-result.ts#L55-L84`](https://github.com/0xNilesh/CREHub/blob/main/gateway/src/on-chain-result.ts#L55-L84) | `writeOnChain()` — `keccak256(resultJson)` → `storeResult()` → wait for receipt → return tx hash |
+
+---
+
+### 5. `workflow.yaml` — CRE DON targets
+
+Each workflow declares its staging and production targets that map to the CRE CLI's `--target` flag.
+
+| File | What it does |
+|------|-------------|
+| [`workflows/aave-health-monitor/workflow.yaml#L14-L19`](https://github.com/0xNilesh/CREHub/blob/main/workflows/aave-health-monitor/workflow.yaml#L14-L19) | `staging-settings` target — workflow name + artifact paths for CRE DON |
+| [`workflows/aave-health-monitor/project.yaml`](https://github.com/0xNilesh/CREHub/blob/main/workflows/aave-health-monitor/project.yaml) | RPC endpoints per target (Sepolia) — referenced by `cre workflow simulate/deploy` |
+| [`workflows/ta-signal/workflow.yaml`](https://github.com/0xNilesh/CREHub/blob/main/workflows/ta-signal/workflow.yaml) | TA Signal workflow targets (local · staging · production) |
+
+---
+
+
 ## System Architecture
 
 ![CREHub System Architecture](diagram/drawiodark1.png#gh-dark-mode-only)
@@ -245,6 +308,68 @@ Production-ready Chainlink CRE workflows shipped in the repo, each with full con
 Each workflow is CRE-locked to the CREHub gateway public key — only the CREHub gateway can trigger them, preventing unauthorized direct execution.
 
 > Source: `workflows/`
+
+---
+
+## CRE Integration — Code References
+
+Every place CREHub directly uses the Chainlink CRE stack, linked to the exact lines on GitHub:
+
+### 1. HTTP Trigger — Workflow locked to CREHub gateway key
+
+Workflows use `HTTPCapability.trigger()` with `authorizedKeys` — only the CREHub gateway's ECDSA public key can fire them. No other caller can trigger execution.
+
+| File | What it does |
+|------|-------------|
+| [`workflows/aave-health-monitor/src/index.ts#L281-L288`](https://github.com/0xNilesh/CREHub/blob/main/workflows/aave-health-monitor/src/index.ts#L281-L288) | `httpCapability.trigger({ authorizedKeys: [{ type: 'KEY_TYPE_ECDSA_EVM', publicKey: config.gatewayPublicKey }] })` |
+| [`workflows/ta-signal/src/index.ts#L296-L303`](https://github.com/0xNilesh/CREHub/blob/main/workflows/ta-signal/src/index.ts#L296-L303) | Same pattern for the TA Signal workflow |
+
+---
+
+### 2. `cre workflow simulate` — Gateway invocation
+
+The gateway shells out to the CRE CLI to execute workflows locally. The full argument construction, payload writing, and output parsing is handled in a single module.
+
+| File | What it does |
+|------|-------------|
+| [`gateway/src/simulate.ts#L79-L111`](https://github.com/0xNilesh/CREHub/blob/main/gateway/src/simulate.ts#L79-L111) | `runSimulate()` — writes `http_trigger_payload.json`, builds CRE CLI args, spawns `cre workflow simulate` |
+| [`gateway/src/simulate.ts#L87`](https://github.com/0xNilesh/CREHub/blob/main/gateway/src/simulate.ts#L87) | `CRE_TARGET` env var selects between `local-simulation` / `staging-settings` / `production-settings` |
+| [`gateway/src/simulate.ts#L103-L110`](https://github.com/0xNilesh/CREHub/blob/main/gateway/src/simulate.ts#L103-L110) | Full CLI args: `workflow simulate . -R . --target <target> --non-interactive --broadcast` |
+| [`gateway/src/payment.ts#L224-L227`](https://github.com/0xNilesh/CREHub/blob/main/gateway/src/payment.ts#L224-L227) | Where `runSimulate()` is called inside the payment-settle flow |
+
+---
+
+### 3. ETH-signed JWT — CRE Gateway authentication
+
+CREHub signs every CRE Gateway request with an Ethereum ECDSA JWT. Header `{ alg: "ETH" }`, payload includes a SHA-256 digest of the JSON-RPC request body, signed with `secp256k1`.
+
+| File | What it does |
+|------|-------------|
+| [`gateway/src/jwt.ts#L1-L11`](https://github.com/0xNilesh/CREHub/blob/main/gateway/src/jwt.ts#L1-L11) | Module header — JWT format spec (ported from CRE SDK reference implementation) |
+| [`gateway/src/jwt.ts`](https://github.com/0xNilesh/CREHub/blob/main/gateway/src/jwt.ts) | Full ETH-signed JWT creation using viem `privateKeyToAccount` + `signMessage` |
+
+---
+
+### 4. `WorkflowResultStore` — On-chain CRE execution proof
+
+After every successful `cre workflow simulate`, the gateway writes `keccak256(outputJson)` to `WorkflowResultStore` on Sepolia — a permanent, verifiable on-chain record of CRE execution even before full DON deployment.
+
+| File | What it does |
+|------|-------------|
+| [`gateway/src/on-chain-result.ts#L27-L30`](https://github.com/0xNilesh/CREHub/blob/main/gateway/src/on-chain-result.ts#L27-L30) | `storeResult(workflowId, resultHash)` ABI — function + `ResultStored` event |
+| [`gateway/src/on-chain-result.ts#L55-L84`](https://github.com/0xNilesh/CREHub/blob/main/gateway/src/on-chain-result.ts#L55-L84) | `writeOnChain()` — `keccak256(resultJson)` → `storeResult()` → wait for receipt → return tx hash |
+
+---
+
+### 5. `workflow.yaml` — CRE DON targets
+
+Each workflow declares its staging and production targets that map to the CRE CLI's `--target` flag.
+
+| File | What it does |
+|------|-------------|
+| [`workflows/aave-health-monitor/workflow.yaml#L14-L19`](https://github.com/0xNilesh/CREHub/blob/main/workflows/aave-health-monitor/workflow.yaml#L14-L19) | `staging-settings` target — workflow name + artifact paths for CRE DON |
+| [`workflows/aave-health-monitor/project.yaml`](https://github.com/0xNilesh/CREHub/blob/main/workflows/aave-health-monitor/project.yaml) | RPC endpoints per target (Sepolia) — referenced by `cre workflow simulate/deploy` |
+| [`workflows/ta-signal/workflow.yaml`](https://github.com/0xNilesh/CREHub/blob/main/workflows/ta-signal/workflow.yaml) | TA Signal workflow targets (local · staging · production) |
 
 ---
 
