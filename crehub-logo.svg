@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="160" viewBox="0 0 520 160">
+  <!-- Background -->
+  <rect width="520" height="160" rx="16" fill="#0B1629"/>
+
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#375BD2"/>
+      <stop offset="100%" stop-color="#7898ff"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Logo mark centered vertically in 160px box, left-padded at x=40 -->
+  <!-- Top node: (100, 44), BotL: (64, 116), BotR: (136, 116) -->
+  <line x1="100" y1="44"  x2="64"  y2="116" stroke="url(#g)" stroke-width="5" stroke-linecap="round"/>
+  <line x1="100" y1="44"  x2="136" y2="116" stroke="url(#g)" stroke-width="5" stroke-linecap="round"/>
+  <line x1="64"  y1="116" x2="136" y2="116" stroke="url(#g)" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="100" cy="44"  r="11" fill="#375BD2"/>
+  <circle cx="64"  cy="116" r="11" fill="#4a6cf7"/>
+  <circle cx="136" cy="116" r="11" fill="#7898ff"/>
+  <circle cx="100" cy="80"  r="7"  fill="rgba(55,91,210,0.6)"/>
+
+  <!-- Wordmark: CRE (white) + Hub (blue) -->
+  <text x="168" y="104" font-family="'Segoe UI', Arial, sans-serif" font-size="72" font-weight="700" letter-spacing="-2" fill="#FFFFFF">CRE</text>
+  <text x="333" y="104" font-family="'Segoe UI', Arial, sans-serif" font-size="72" font-weight="700" letter-spacing="-2" fill="#7898ff">Hub</text>
+</svg>
