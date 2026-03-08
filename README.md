@@ -92,6 +92,40 @@ Each workflow declares its staging and production targets that map to the CRE CL
 
 ---
 
+### 6. `@chainlink/cre-sdk` — SDK imports in workflow source
+
+Workflows import directly from the official `@chainlink/cre-sdk` package — `HTTPCapability`, `EVMClient`, `prepareReportRequest`, `Runner`, `handler` and more. The Aave workflow also uses `EVMClient.writeReport()` to push results on-chain via the CRE Forwarder.
+
+| File | What it does |
+|------|-------------|
+| [`workflows/aave-health-monitor/src/index.ts#L1-L13`](https://github.com/0xNilesh/CREHub/blob/main/workflows/aave-health-monitor/src/index.ts#L1-L13) | Imports `HTTPCapability`, `EVMClient`, `prepareReportRequest`, `TxStatus`, `bytesToHex`, `getNetwork` from `@chainlink/cre-sdk` |
+| [`workflows/ta-signal/src/index.ts`](https://github.com/0xNilesh/CREHub/blob/main/workflows/ta-signal/src/index.ts) | Full TA Signal workflow built on CRE SDK — RSI, MACD, Bollinger Bands via HTTP capability |
+| [`crehub-cli/src/template/index.ts#L14`](https://github.com/0xNilesh/CREHub/blob/main/crehub-cli/src/template/index.ts#L14) | CLI scaffold template imports `@chainlink/cre-sdk` — every `crehub init` generates a CRE-SDK workflow |
+
+---
+
+### 7. `CREHubExecutor.sol` — CRE Forwarder receiver contract
+
+The production on-chain integration. CRE workflows call `EVMClient.writeReport(receiver=CREHubExecutor)` from the DON. The Chainlink CRE Forwarder then calls `onReport()` on this contract with the consensus-signed result — storing `keccak256(outputJson)` permanently on Sepolia.
+
+```
+CRE Workflow (TypeScript, DON)
+    │  EVMClient.writeReport(receiver=CREHubExecutor)
+    ▼
+CRE Forwarder  ← Chainlink-managed, fixed per chain
+    │  forwarder.call → CREHubExecutor.onReport(metadata, report)
+    ▼
+CREHubExecutor  ← stores resultHash on Sepolia
+```
+
+| File | What it does |
+|------|-------------|
+| [`contracts/src/CREHubExecutor.sol#L61-L72`](https://github.com/0xNilesh/CREHub/blob/main/contracts/src/CREHubExecutor.sol#L61-L72) | `onReport()` — entry-point called by CRE Forwarder, only `msg.sender == CRE_FORWARDER` allowed |
+| [`contracts/src/CREHubExecutor.sol#L27-L28`](https://github.com/0xNilesh/CREHub/blob/main/contracts/src/CREHubExecutor.sol#L27-L28) | `CRE_FORWARDER` immutable — Chainlink-provided forwarder address locked at construction |
+| [`contracts/src/WorkflowResultStore.sol`](https://github.com/0xNilesh/CREHub/blob/main/contracts/src/WorkflowResultStore.sol) | Simpler gateway-signed result store — used for simulate-mode proofs (46 on-chain executions) |
+
+---
+
 
 ## System Architecture
 
@@ -370,6 +404,60 @@ Each workflow declares its staging and production targets that map to the CRE CL
 | [`workflows/aave-health-monitor/workflow.yaml#L14-L19`](https://github.com/0xNilesh/CREHub/blob/main/workflows/aave-health-monitor/workflow.yaml#L14-L19) | `staging-settings` target — workflow name + artifact paths for CRE DON |
 | [`workflows/aave-health-monitor/project.yaml`](https://github.com/0xNilesh/CREHub/blob/main/workflows/aave-health-monitor/project.yaml) | RPC endpoints per target (Sepolia) — referenced by `cre workflow simulate/deploy` |
 | [`workflows/ta-signal/workflow.yaml`](https://github.com/0xNilesh/CREHub/blob/main/workflows/ta-signal/workflow.yaml) | TA Signal workflow targets (local · staging · production) |
+
+---
+
+## Screenshots
+
+### Marketplace
+
+<div align="center">
+<img src="ui_screens/homepage.png" alt="CREHub Homepage" width="49%"/>
+<img src="ui_screens/browse_workflow%20page.png" alt="Browse Workflows" width="49%"/>
+</div>
+
+<p align="center">
+<em>Landing page &nbsp;·&nbsp; Browse & search workflows by category</em>
+</p>
+
+---
+
+### Agent Console — In-Browser x402 Execution
+
+<div align="center">
+<img src="ui_screens/agentconslepage1.png" alt="Agent Console Search" width="49%"/>
+<img src="ui_screens/agentconsolepage.png" alt="Agent Console Execution Result" width="49%"/>
+</div>
+
+<p align="center">
+<em>Semantic search for "monitor aave health factor" &nbsp;·&nbsp; Execution result with on-chain proof</em>
+</p>
+
+---
+
+### Claude MCP Integration — Native AI Trigger
+
+<div align="center">
+<img src="ui_screens/claude_mcpaction.png" alt="Claude MCP Payment Flow" width="49%"/>
+<img src="ui_screens/claudemcpaction2.png" alt="Claude MCP Analysis Result" width="49%"/>
+</div>
+
+<p align="center">
+<em>Claude discovering & paying for SOL/USDT TA Signal via MetaMask &nbsp;·&nbsp; AI analysis result returned directly in chat</em>
+</p>
+
+---
+
+### crehub-cli — Developer Toolkit
+
+<div align="center">
+<img src="ui_screens/crehubcli_otherutility.png" alt="crehub help" width="49%"/>
+<img src="ui_screens/crehubcli.png" alt="crehub init" width="49%"/>
+</div>
+
+<p align="center">
+<em>Full CLI command reference &nbsp;·&nbsp; <code>crehub init</code> scaffolding a new CRE workflow project</em>
+</p>
 
 ---
 
