@@ -30,9 +30,11 @@ An agent needs to check a DeFi health factor, run a technical analysis signal, o
 
 ---
 
+
+
 ## CRE Integration — Code References
 
-CRE code reference  -
+Every place CREHub directly uses the Chainlink CRE stack, linked to the exact lines on GitHub:
 
 ### 1. HTTP Trigger — Workflow locked to CREHub gateway key
 
@@ -92,40 +94,59 @@ Each workflow declares its staging and production targets that map to the CRE CL
 
 ---
 
-### 6. `@chainlink/cre-sdk` — SDK imports in workflow source
+## Screenshots
 
-Workflows import directly from the official `@chainlink/cre-sdk` package — `HTTPCapability`, `EVMClient`, `prepareReportRequest`, `Runner`, `handler` and more. The Aave workflow also uses `EVMClient.writeReport()` to push results on-chain via the CRE Forwarder.
+### Marketplace
 
-| File | What it does |
-|------|-------------|
-| [`workflows/aave-health-monitor/src/index.ts#L1-L13`](https://github.com/0xNilesh/CREHub/blob/main/workflows/aave-health-monitor/src/index.ts#L1-L13) | Imports `HTTPCapability`, `EVMClient`, `prepareReportRequest`, `TxStatus`, `bytesToHex`, `getNetwork` from `@chainlink/cre-sdk` |
-| [`workflows/ta-signal/src/index.ts`](https://github.com/0xNilesh/CREHub/blob/main/workflows/ta-signal/src/index.ts) | Full TA Signal workflow built on CRE SDK — RSI, MACD, Bollinger Bands via HTTP capability |
-| [`crehub-cli/src/template/index.ts#L14`](https://github.com/0xNilesh/CREHub/blob/main/crehub-cli/src/template/index.ts#L14) | CLI scaffold template imports `@chainlink/cre-sdk` — every `crehub init` generates a CRE-SDK workflow |
+<div align="center">
+<img src="ui_screens/homepage.png" alt="CREHub Homepage" width="49%"/>
+<img src="ui_screens/browse_workflow%20page.png" alt="Browse Workflows" width="49%"/>
+</div>
 
----
-
-### 7. `CREHubExecutor.sol` — CRE Forwarder receiver contract
-
-The production on-chain integration. CRE workflows call `EVMClient.writeReport(receiver=CREHubExecutor)` from the DON. The Chainlink CRE Forwarder then calls `onReport()` on this contract with the consensus-signed result — storing `keccak256(outputJson)` permanently on Sepolia.
-
-```
-CRE Workflow (TypeScript, DON)
-    │  EVMClient.writeReport(receiver=CREHubExecutor)
-    ▼
-CRE Forwarder  ← Chainlink-managed, fixed per chain
-    │  forwarder.call → CREHubExecutor.onReport(metadata, report)
-    ▼
-CREHubExecutor  ← stores resultHash on Sepolia
-```
-
-| File | What it does |
-|------|-------------|
-| [`contracts/src/CREHubExecutor.sol#L61-L72`](https://github.com/0xNilesh/CREHub/blob/main/contracts/src/CREHubExecutor.sol#L61-L72) | `onReport()` — entry-point called by CRE Forwarder, only `msg.sender == CRE_FORWARDER` allowed |
-| [`contracts/src/CREHubExecutor.sol#L27-L28`](https://github.com/0xNilesh/CREHub/blob/main/contracts/src/CREHubExecutor.sol#L27-L28) | `CRE_FORWARDER` immutable — Chainlink-provided forwarder address locked at construction |
-| [`contracts/src/WorkflowResultStore.sol`](https://github.com/0xNilesh/CREHub/blob/main/contracts/src/WorkflowResultStore.sol) | Simpler gateway-signed result store — used for simulate-mode proofs (46 on-chain executions) |
+<p align="center">
+<em>Landing page &nbsp;·&nbsp; Browse & search workflows by category</em>
+</p>
 
 ---
 
+### Agent Console — In-Browser x402 Execution
+
+<div align="center">
+<img src="ui_screens/agentconslepage1.png" alt="Agent Console Search" width="49%"/>
+<img src="ui_screens/agentconsolepage.png" alt="Agent Console Execution Result" width="49%"/>
+</div>
+
+<p align="center">
+<em>Semantic search for "monitor aave health factor" &nbsp;·&nbsp; Execution result with on-chain proof</em>
+</p>
+
+---
+
+### Claude MCP Integration — Native AI Trigger
+
+<div align="center">
+<img src="ui_screens/claude_mcpaction.png" alt="Claude MCP Payment Flow" width="49%"/>
+<img src="ui_screens/claudemcpaction2.png" alt="Claude MCP Analysis Result" width="49%"/>
+</div>
+
+<p align="center">
+<em>Claude discovering & paying for SOL/USDT TA Signal via MetaMask &nbsp;·&nbsp; AI analysis result returned directly in chat</em>
+</p>
+
+---
+
+### crehub-cli — Developer Toolkit
+
+<div align="center">
+<img src="ui_screens/crehubcli_otherutility.png" alt="crehub help" width="49%"/>
+<img src="ui_screens/crehubcli.png" alt="crehub init" width="49%"/>
+</div>
+
+<p align="center">
+<em>Full CLI command reference &nbsp;·&nbsp; <code>crehub init</code> scaffolding a new CRE workflow project</em>
+</p>
+
+---
 
 ## System Architecture
 
@@ -138,8 +159,6 @@ CREHubExecutor  ← stores resultHash on Sepolia
 
 ![CREHub System Flow](diagram/system%20flow%20dark.png#gh-dark-mode-only)
 ![CREHub System Flow](diagram/system%20flow%20light.png#gh-light-mode-only)
-
----
 
 <br/>
 
@@ -162,6 +181,57 @@ CREHubExecutor  ← stores resultHash on Sepolia
 
 ---
 
+## Deployed Contracts — Ethereum Sepolia
+
+| Contract | Address | Etherscan |
+|----------|---------|-----------|
+| `WorkflowRegistry` | `0xb2fb76A7DFF182c957dF5586697a2B76Cb49709e` | [↗](https://sepolia.etherscan.io/address/0xb2fb76A7DFF182c957dF5586697a2B76Cb49709e) |
+| `SettlementVault` | `0xf50513FC4f4C248eAF6F72F687f0A91B5FDc2E60` | [↗](https://sepolia.etherscan.io/address/0xf50513FC4f4C248eAF6F72F687f0A91B5FDc2E60) |
+| `WorkflowResultStore` | `0xD4CE3309d05426446f3E778Dd294F00beBf3A12a` | [↗](https://sepolia.etherscan.io/address/0xD4CE3309d05426446f3E778Dd294F00beBf3A12a) |
+| `USDC (Circle Sepolia)` | `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238` | [↗](https://sepolia.etherscan.io/address/0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238) |
+
+| Wallet | Address | Role |
+|--------|---------|------|
+| Gateway / Platform | `0xFBDf4Dc13ed423C1E534Da0b2ed229B6a376a31f` | Receives x402 USDC payments |
+| Treasury | `0x1EF7F4c06cB7630FdcB5DD324f22C0A8Ec85F93F` | Receives protocol fees (10% / 1%) |
+| CRE Executor | `0x2b8Ad3f705Db838508bF93665FC1EcC361390Aa3` | CRE DON forwarder / executor |
+| Agent (demo) | `0xd5ce188fFae83BdF5Fb27EbFafCc29fA11DCd50E` | AI agent wallet used in demo runs |
+
+---
+
+## Live Transaction Proof — 46 Executions On-Chain
+
+All executions are visible at **[/explorer](http://localhost:3000/explorer)** on the running frontend.
+
+### Latest 3 Settled Executions
+
+**#1 — TA Signal · SOL/USDT · 5m · HOLD** _(2026-03-07 14:34 UTC)_
+
+| Field | Hash |
+|-------|------|
+| USDC Payment tx | [`0x31712f7d...`](https://sepolia.etherscan.io/tx/0x31712f7d2fd0d25c7818c375a80e25ee3b4eb2f6e529882db917db5455f51d20) |
+| Settlement tx (`ExecutionSettled`) | [`0x9e90687...`](https://sepolia.etherscan.io/tx/0x9e90687023b89289c716df372262acd06fc0beb12b63d9cafeed88bd57f8ae09) |
+| CRE Broadcast tx (`WorkflowResultStore`) | [`0x877bb17...`](https://sepolia.etherscan.io/tx/0x877bb17314e6e9fded288ed0dacaa535adb33c8dc28e5bffa72c2476cae5ca9a) |
+
+**#2 — Aave Health Monitor · HF 2.049 · safe** _(2026-03-07 14:28 UTC)_
+
+| Field | Hash |
+|-------|------|
+| USDC Payment tx | [`0x3e7517d...`](https://sepolia.etherscan.io/tx/0x3e7517dfcb7bd9485b052a991bcb60072320a3aad710534e9264788e4a8f3024) |
+| Settlement tx (`ExecutionSettled`) | [`0x7dcb50c...`](https://sepolia.etherscan.io/tx/0x7dcb50ca7b668a1f399a68d76ca6f726e34759b40a9300748b152c2576620666) |
+| CRE Broadcast tx (`WorkflowResultStore`) | [`0x673a248...`](https://sepolia.etherscan.io/tx/0x673a248a06d441135081cd66de0885e2082a81c047f46250a3cd94af98af43f7) |
+
+**#3 — TA Signal · BTC/USDT · 1h · BUY** _(2026-03-07 14:25 UTC)_
+
+| Field | Hash |
+|-------|------|
+| USDC Payment tx | [`0x0434be5...`](https://sepolia.etherscan.io/tx/0x0434be53e7cca1c00c786a20c77c9f8ab0a6750bd0927ac4576560acac2f0604) |
+| Settlement tx (`ExecutionSettled`) | [`0x0d0b0c3...`](https://sepolia.etherscan.io/tx/0x0d0b0c355a23d76be839010d1582d69b4c841220c8b3f8e234f71f68f8d8a955) |
+| CRE Broadcast tx (`WorkflowResultStore`) | [`0xfce8ada...`](https://sepolia.etherscan.io/tx/0xfce8adade748b850b49d6ebc60bab9afa075707052104b02cc772d06ae3a3a80) |
+
+Each execution has three verifiable on-chain proofs: the USDC payment transfer, the escrow settlement event from `SettlementVault`, and the CRE workflow result recorded in `WorkflowResultStore` by the Chainlink CRE Forwarder.
+
+---
 ## Components
 
 ### crehub-cli — Developer Toolkit
@@ -345,173 +415,6 @@ Each workflow is CRE-locked to the CREHub gateway public key — only the CREHub
 
 ---
 
-## CRE Integration — Code References
-
-Every place CREHub directly uses the Chainlink CRE stack, linked to the exact lines on GitHub:
-
-### 1. HTTP Trigger — Workflow locked to CREHub gateway key
-
-Workflows use `HTTPCapability.trigger()` with `authorizedKeys` — only the CREHub gateway's ECDSA public key can fire them. No other caller can trigger execution.
-
-| File | What it does |
-|------|-------------|
-| [`workflows/aave-health-monitor/src/index.ts#L281-L288`](https://github.com/0xNilesh/CREHub/blob/main/workflows/aave-health-monitor/src/index.ts#L281-L288) | `httpCapability.trigger({ authorizedKeys: [{ type: 'KEY_TYPE_ECDSA_EVM', publicKey: config.gatewayPublicKey }] })` |
-| [`workflows/ta-signal/src/index.ts#L296-L303`](https://github.com/0xNilesh/CREHub/blob/main/workflows/ta-signal/src/index.ts#L296-L303) | Same pattern for the TA Signal workflow |
-
----
-
-### 2. `cre workflow simulate` — Gateway invocation
-
-The gateway shells out to the CRE CLI to execute workflows locally. The full argument construction, payload writing, and output parsing is handled in a single module.
-
-| File | What it does |
-|------|-------------|
-| [`gateway/src/simulate.ts#L79-L111`](https://github.com/0xNilesh/CREHub/blob/main/gateway/src/simulate.ts#L79-L111) | `runSimulate()` — writes `http_trigger_payload.json`, builds CRE CLI args, spawns `cre workflow simulate` |
-| [`gateway/src/simulate.ts#L87`](https://github.com/0xNilesh/CREHub/blob/main/gateway/src/simulate.ts#L87) | `CRE_TARGET` env var selects between `local-simulation` / `staging-settings` / `production-settings` |
-| [`gateway/src/simulate.ts#L103-L110`](https://github.com/0xNilesh/CREHub/blob/main/gateway/src/simulate.ts#L103-L110) | Full CLI args: `workflow simulate . -R . --target <target> --non-interactive --broadcast` |
-| [`gateway/src/payment.ts#L224-L227`](https://github.com/0xNilesh/CREHub/blob/main/gateway/src/payment.ts#L224-L227) | Where `runSimulate()` is called inside the payment-settle flow |
-
----
-
-### 3. ETH-signed JWT — CRE Gateway authentication
-
-CREHub signs every CRE Gateway request with an Ethereum ECDSA JWT. Header `{ alg: "ETH" }`, payload includes a SHA-256 digest of the JSON-RPC request body, signed with `secp256k1`.
-
-| File | What it does |
-|------|-------------|
-| [`gateway/src/jwt.ts#L1-L11`](https://github.com/0xNilesh/CREHub/blob/main/gateway/src/jwt.ts#L1-L11) | Module header — JWT format spec (ported from CRE SDK reference implementation) |
-| [`gateway/src/jwt.ts`](https://github.com/0xNilesh/CREHub/blob/main/gateway/src/jwt.ts) | Full ETH-signed JWT creation using viem `privateKeyToAccount` + `signMessage` |
-
----
-
-### 4. `WorkflowResultStore` — On-chain CRE execution proof
-
-After every successful `cre workflow simulate`, the gateway writes `keccak256(outputJson)` to `WorkflowResultStore` on Sepolia — a permanent, verifiable on-chain record of CRE execution even before full DON deployment.
-
-| File | What it does |
-|------|-------------|
-| [`gateway/src/on-chain-result.ts#L27-L30`](https://github.com/0xNilesh/CREHub/blob/main/gateway/src/on-chain-result.ts#L27-L30) | `storeResult(workflowId, resultHash)` ABI — function + `ResultStored` event |
-| [`gateway/src/on-chain-result.ts#L55-L84`](https://github.com/0xNilesh/CREHub/blob/main/gateway/src/on-chain-result.ts#L55-L84) | `writeOnChain()` — `keccak256(resultJson)` → `storeResult()` → wait for receipt → return tx hash |
-
----
-
-### 5. `workflow.yaml` — CRE DON targets
-
-Each workflow declares its staging and production targets that map to the CRE CLI's `--target` flag.
-
-| File | What it does |
-|------|-------------|
-| [`workflows/aave-health-monitor/workflow.yaml#L14-L19`](https://github.com/0xNilesh/CREHub/blob/main/workflows/aave-health-monitor/workflow.yaml#L14-L19) | `staging-settings` target — workflow name + artifact paths for CRE DON |
-| [`workflows/aave-health-monitor/project.yaml`](https://github.com/0xNilesh/CREHub/blob/main/workflows/aave-health-monitor/project.yaml) | RPC endpoints per target (Sepolia) — referenced by `cre workflow simulate/deploy` |
-| [`workflows/ta-signal/workflow.yaml`](https://github.com/0xNilesh/CREHub/blob/main/workflows/ta-signal/workflow.yaml) | TA Signal workflow targets (local · staging · production) |
-
----
-
-## Screenshots
-
-### Marketplace
-
-<div align="center">
-<img src="ui_screens/homepage.png" alt="CREHub Homepage" width="49%"/>
-<img src="ui_screens/browse_workflow%20page.png" alt="Browse Workflows" width="49%"/>
-</div>
-
-<p align="center">
-<em>Landing page &nbsp;·&nbsp; Browse & search workflows by category</em>
-</p>
-
----
-
-### Agent Console — In-Browser x402 Execution
-
-<div align="center">
-<img src="ui_screens/agentconslepage1.png" alt="Agent Console Search" width="49%"/>
-<img src="ui_screens/agentconsolepage.png" alt="Agent Console Execution Result" width="49%"/>
-</div>
-
-<p align="center">
-<em>Semantic search for "monitor aave health factor" &nbsp;·&nbsp; Execution result with on-chain proof</em>
-</p>
-
----
-
-### Claude MCP Integration — Native AI Trigger
-
-<div align="center">
-<img src="ui_screens/claude_mcpaction.png" alt="Claude MCP Payment Flow" width="49%"/>
-<img src="ui_screens/claudemcpaction2.png" alt="Claude MCP Analysis Result" width="49%"/>
-</div>
-
-<p align="center">
-<em>Claude discovering & paying for SOL/USDT TA Signal via MetaMask &nbsp;·&nbsp; AI analysis result returned directly in chat</em>
-</p>
-
----
-
-### crehub-cli — Developer Toolkit
-
-<div align="center">
-<img src="ui_screens/crehubcli_otherutility.png" alt="crehub help" width="49%"/>
-<img src="ui_screens/crehubcli.png" alt="crehub init" width="49%"/>
-</div>
-
-<p align="center">
-<em>Full CLI command reference &nbsp;·&nbsp; <code>crehub init</code> scaffolding a new CRE workflow project</em>
-</p>
-
----
-
-## Deployed Contracts — Ethereum Sepolia
-
-| Contract | Address | Etherscan |
-|----------|---------|-----------|
-| `WorkflowRegistry` | `0xb2fb76A7DFF182c957dF5586697a2B76Cb49709e` | [↗](https://sepolia.etherscan.io/address/0xb2fb76A7DFF182c957dF5586697a2B76Cb49709e) |
-| `SettlementVault` | `0xf50513FC4f4C248eAF6F72F687f0A91B5FDc2E60` | [↗](https://sepolia.etherscan.io/address/0xf50513FC4f4C248eAF6F72F687f0A91B5FDc2E60) |
-| `WorkflowResultStore` | `0xD4CE3309d05426446f3E778Dd294F00beBf3A12a` | [↗](https://sepolia.etherscan.io/address/0xD4CE3309d05426446f3E778Dd294F00beBf3A12a) |
-| `USDC (Circle Sepolia)` | `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238` | [↗](https://sepolia.etherscan.io/address/0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238) |
-
-| Wallet | Address | Role |
-|--------|---------|------|
-| Gateway / Platform | `0xFBDf4Dc13ed423C1E534Da0b2ed229B6a376a31f` | Receives x402 USDC payments |
-| Treasury | `0x1EF7F4c06cB7630FdcB5DD324f22C0A8Ec85F93F` | Receives protocol fees (10% / 1%) |
-| CRE Executor | `0x2b8Ad3f705Db838508bF93665FC1EcC361390Aa3` | CRE DON forwarder / executor |
-| Agent (demo) | `0xd5ce188fFae83BdF5Fb27EbFafCc29fA11DCd50E` | AI agent wallet used in demo runs |
-
----
-
-## Live Transaction Proof — 46 Executions On-Chain
-
-All executions are visible at **[/explorer](http://localhost:3000/explorer)** on the running frontend.
-
-### Latest 3 Settled Executions
-
-**#1 — TA Signal · SOL/USDT · 5m · HOLD** _(2026-03-07 14:34 UTC)_
-
-| Field | Hash |
-|-------|------|
-| USDC Payment tx | [`0x31712f7d...`](https://sepolia.etherscan.io/tx/0x31712f7d2fd0d25c7818c375a80e25ee3b4eb2f6e529882db917db5455f51d20) |
-| Settlement tx (`ExecutionSettled`) | [`0x9e90687...`](https://sepolia.etherscan.io/tx/0x9e90687023b89289c716df372262acd06fc0beb12b63d9cafeed88bd57f8ae09) |
-| CRE Broadcast tx (`WorkflowResultStore`) | [`0x877bb17...`](https://sepolia.etherscan.io/tx/0x877bb17314e6e9fded288ed0dacaa535adb33c8dc28e5bffa72c2476cae5ca9a) |
-
-**#2 — Aave Health Monitor · HF 2.049 · safe** _(2026-03-07 14:28 UTC)_
-
-| Field | Hash |
-|-------|------|
-| USDC Payment tx | [`0x3e7517d...`](https://sepolia.etherscan.io/tx/0x3e7517dfcb7bd9485b052a991bcb60072320a3aad710534e9264788e4a8f3024) |
-| Settlement tx (`ExecutionSettled`) | [`0x7dcb50c...`](https://sepolia.etherscan.io/tx/0x7dcb50ca7b668a1f399a68d76ca6f726e34759b40a9300748b152c2576620666) |
-| CRE Broadcast tx (`WorkflowResultStore`) | [`0x673a248...`](https://sepolia.etherscan.io/tx/0x673a248a06d441135081cd66de0885e2082a81c047f46250a3cd94af98af43f7) |
-
-**#3 — TA Signal · BTC/USDT · 1h · BUY** _(2026-03-07 14:25 UTC)_
-
-| Field | Hash |
-|-------|------|
-| USDC Payment tx | [`0x0434be5...`](https://sepolia.etherscan.io/tx/0x0434be53e7cca1c00c786a20c77c9f8ab0a6750bd0927ac4576560acac2f0604) |
-| Settlement tx (`ExecutionSettled`) | [`0x0d0b0c3...`](https://sepolia.etherscan.io/tx/0x0d0b0c355a23d76be839010d1582d69b4c841220c8b3f8e234f71f68f8d8a955) |
-| CRE Broadcast tx (`WorkflowResultStore`) | [`0xfce8ada...`](https://sepolia.etherscan.io/tx/0xfce8adade748b850b49d6ebc60bab9afa075707052104b02cc772d06ae3a3a80) |
-
-Each execution has three verifiable on-chain proofs: the USDC payment transfer, the escrow settlement event from `SettlementVault`, and the CRE workflow result recorded in `WorkflowResultStore` by the Chainlink CRE Forwarder.
-
----
 
 ## Quick Start
 
@@ -621,4 +524,4 @@ CREHub/
 
 ## License
 
-MIT
+
