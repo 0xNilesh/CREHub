@@ -30,6 +30,18 @@ An agent needs to check a DeFi health factor, run a technical analysis signal, o
 
 ---
 
+## End-to-End Flow
+
+<div align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)"  srcset="diagram/system flow dark.png"/>
+  <source media="(prefers-color-scheme: light)" srcset="diagram/system flow light.png"/>
+  <img src="diagram/system flow light.png" alt="CREHub System Flow" width="900"/>
+</picture>
+</div>
+
+<br/>
+
 ## System Architecture
 
 <div align="center">
@@ -40,19 +52,11 @@ An agent needs to check a DeFi health factor, run a technical analysis signal, o
 </picture>
 </div>
 
-<br/>
+
 
 ---
 
-## End-to-End Flow
 
-<div align="center">
-<picture>
-  <source media="(prefers-color-scheme: dark)"  srcset="diagram/system flow dark.png"/>
-  <source media="(prefers-color-scheme: light)" srcset="diagram/system flow light.png"/>
-  <img src="diagram/system flow light.png" alt="CREHub System Flow" width="900"/>
-</picture>
-</div>
 
 <br/>
 
